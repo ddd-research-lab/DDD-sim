@@ -1,0 +1,61 @@
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #3b82f6;
+  --secondary: #1d4ed8;
+  --accent: #f59e0b;
+  --card-bg: #171717;
+  --card-border: #262626;
+  --zone-bg: rgba(255, 255, 255, 0.05);
+  --zone-border: rgba(255, 255, 255, 0.1);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  /* App-like feel */
+  height: 100vh;
+  width: 100vw;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+@keyframes green-pulse {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+    border-color: #00ff00;
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+    border-color: #55ff55;
+  }
+
+  100% {
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+    border-color: #00ff00;
+  }
+}
+
+.trigger-glow {
+  animation: green-pulse 1.5s infinite;
+  border: 2px solid #00ff00 !important;
+  z-index: 50;
+}
