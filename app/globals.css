@@ -94,8 +94,8 @@ button {
 }
 
 .log-toggle-btn {
-  display: none;
-  /* Hidden on PC by default */
+  /* display: none; */
+  /* Enabled for PC */
   position: fixed;
   top: 10px;
   right: 10px;

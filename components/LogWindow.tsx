@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { formatLog } from '@/data/locales';
 
 export function LogWindow() {
-    const { logs, jumpToLog, replay, stopReplay, isReplaying, replaySpeed, toggleReplaySpeed, jumpHistory, returnFromJump } = useGameStore();
-    const [isAscending, setIsAscending] = useState(true);
+    const { logs, jumpToLog, isReplaying, logOrder } = useGameStore();
+
+    // 'newest' = descending (latest first), 'oldest' = ascending (oldest first)
+    const isAscending = logOrder === 'oldest';
 
     const displayedLogs = isAscending
-        ? logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex })).reverse()
-        : logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex }));
+        ? logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex }))
+        : logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex })).reverse();
 
     return (
         <div style={{
@@ -27,94 +29,32 @@ export function LogWindow() {
             display: 'flex',
             flexDirection: 'column',
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #555', paddingBottom: '5px', marginBottom: '5px' }}>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderBottom: '1px solid #555',
+                paddingBottom: '5px',
+                marginBottom: '5px',
+                gap: '8px'
+            }}>
+                <button
+                    onClick={() => useGameStore.getState().toggleLogOrder()}
+                    style={{
+                        padding: '2px 8px',
+                        fontSize: '10px',
+                        backgroundColor: '#555',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                    }}
+                    title="Toggle Log Order"
+                >
+                    {logOrder === 'newest' ? '▼' : '▲'}
+                </button>
                 <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                    {isReplaying ? (
-                        <button
-                            onClick={() => stopReplay()}
-                            style={{
-                                padding: '2px 8px',
-                                fontSize: '10px',
-                                backgroundColor: '#f44336',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: '#fff',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            ■ {formatLog('ui_stop')}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => replay()}
-                            disabled={logs.length === 0}
-                            style={{
-                                padding: '2px 8px',
-                                fontSize: '10px',
-                                backgroundColor: '#4caf50',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: '#fff',
-                                cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
-                                opacity: logs.length === 0 ? 0.5 : 1
-                            }}
-                        >
-                            ▶ {formatLog('ui_replay')}
-                        </button>
-                    )}
-
-                    {jumpHistory && jumpHistory.length > 0 && (
-                        <button
-                            onClick={() => returnFromJump()}
-                            style={{
-                                padding: '2px 8px',
-                                fontSize: '10px',
-                                backgroundColor: '#2196F3', // Blue
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: '#fff',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            ↩ {formatLog('ui_return_jump')}
-                        </button>
-                    )}
-
-                    {isReplaying && (
-                        <button
-                            onClick={() => toggleReplaySpeed()}
-                            style={{
-                                padding: '2px 8px',
-                                fontSize: '10px',
-                                backgroundColor: '#ff9800',
-                                border: 'none',
-                                borderRadius: '4px',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                minWidth: '30px'
-                            }}
-                        >
-                            {replaySpeed}x
-                        </button>
-                    )}
-
-                    <button
-                        onClick={() => setIsAscending(!isAscending)}
-                        style={{
-                            padding: '2px 8px',
-                            fontSize: '10px',
-                            backgroundColor: isAscending ? '#4a90d9' : '#555',
-                            border: 'none',
-                            borderRadius: '4px',
-                            color: '#fff',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        {isAscending ? formatLog('ui_new') : formatLog('ui_old')}
-                    </button>
-                </div>
             </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                 {displayedLogs.map(({ log, displayIndex, originalIndex }, i) => (
                     <div

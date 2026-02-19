@@ -40,6 +40,7 @@ export interface GameState {
     language: 'en' | 'ja';
     normalSummonUsed: boolean;
     materials: { [hostId: string]: string[] }; // hostId -> list of attached cardIds
+    backgroundColor: string; // User preference
 
     // Logs
     logs: string[];

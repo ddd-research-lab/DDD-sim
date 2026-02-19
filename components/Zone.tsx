@@ -24,6 +24,7 @@ export function Zone({ id, type, index, children, label, style: customStyle }: Z
 
     const zoneSelectionState = useGameStore((state) => state.zoneSelectionState);
     const resolveZoneSelection = useGameStore((state) => state.resolveZoneSelection);
+    const fieldColor = useGameStore((state) => state.fieldColor);
 
     const isSelectingZone = zoneSelectionState.isOpen;
     const zoneSelectionFilter = zoneSelectionState.filter;
@@ -38,6 +39,7 @@ export function Zone({ id, type, index, children, label, style: customStyle }: Z
 
         if (isValidTarget && typeof index === 'number') {
             resolveZoneSelection(type, index);
+            return;
         }
     };
 
@@ -45,7 +47,7 @@ export function Zone({ id, type, index, children, label, style: customStyle }: Z
         width: '90px',
         height: '130px',
         border: isValidTarget ? '2px solid #0f0' : '1px dashed var(--zone-border)',
-        backgroundColor: isOver ? 'rgba(255, 255, 255, 0.15)' : (isValidTarget ? 'rgba(0, 255, 0, 0.1)' : 'var(--zone-bg)'),
+        backgroundColor: isOver ? 'rgba(255, 255, 255, 0.15)' : (isValidTarget ? 'rgba(0, 255, 0, 0.1)' : (fieldColor || 'var(--zone-bg)')),
         borderRadius: '6px',
         display: 'flex',
         alignItems: 'center',

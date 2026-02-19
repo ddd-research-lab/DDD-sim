@@ -25,9 +25,35 @@ import { EffectSelectionModal } from '@/components/EffectSelectionModal';
 import { formatLog, getCardName } from '@/data/locales';
 
 export default function Home() {
-  const { initializeGame, moveCard, deck, setDeck, cards, activeDragId, setDragState } = useGameStore();
+  const {
+    initializeGame,
+    moveCard,
+    deck,
+    setDeck,
+    cards,
+    activeDragId,
+    setDragState,
+    backgroundColor,
+    setBackgroundColor,
+    fieldColor,
+    setFieldColor,
+    useGradient,
+    setUseGradient,
+    replaySpeed,
+    setReplaySpeed,
+    cycleReplaySpeed,
+    showPendulumCutIn,
+    logOrder,
+    toggleLogOrder,
+    stopReplay,
+    replay,
+    isReplaying,
+    logs,
+    jumpHistory,
+    returnFromJump
+  } = useGameStore();
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
-  const [showMobileLog, setShowMobileLog] = useState(false);
+  const [showLog, setShowLog] = useState(true); // Default Open on PC
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -36,6 +62,17 @@ export default function Home() {
       },
     })
   );
+
+  useEffect(() => {
+    // ... (existing initialization logic can stay, or is this replace too wide?)
+    // Let's target specific blocks to be safe.
+    // Actually, I need to update the `return` block.
+    // So let's split this.
+    // I'll update the Destructuring first.
+  }, []);
+
+  // ...
+
 
   useEffect(() => {
     // Initialize Game
@@ -230,52 +267,176 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <main className="main-container">
-        {/* Mobile Log Toggle Button */}
+      <main className="main-container" style={{
+        background: useGradient
+          ? `radial-gradient(circle at center, ${backgroundColor || '#201025'}, #000)`
+          : (backgroundColor || '#000000')
+      }}>
+        {/* Log Toggle Button */}
         <button
           className="log-toggle-btn"
-          onClick={() => setShowMobileLog(!showMobileLog)}
+          onClick={() => setShowLog(!showLog)}
+          style={{ zIndex: 101 }} // Ensure above log area
         >
-          {showMobileLog ? 'Close Log' : 'Log'}
+          {showLog ? 'Close Log' : 'Log'}
         </button>
 
         {/* Main Game Area */}
         <div className="game-area">
-          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <span>{formatLog('ui_title')}</span>
-            <div style={{ display: 'flex', gap: '5px' }}>
+
+            {/* Controls Container */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+              {/* Replay / Stop Control */}
+              {useGameStore.getState().isReplaying ? (
+                <button
+                  onClick={() => useGameStore.getState().stopReplay()}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    backgroundColor: '#f44336',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  ■ {formatLog('ui_stop')}
+                </button>
+              ) : (
+                <button
+                  onClick={() => useGameStore.getState().replay()}
+                  disabled={useGameStore.getState().logs.length === 0}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    backgroundColor: '#4caf50',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    cursor: useGameStore.getState().logs.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: useGameStore.getState().logs.length === 0 ? 0.5 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  ▶ {formatLog('ui_replay')}
+                </button>
+              )}
+
+              {/* Return Jump (Conditional) */}
+              {useGameStore.getState().jumpHistory && useGameStore.getState().jumpHistory.length > 0 && (
+                <button
+                  onClick={() => useGameStore.getState().returnFromJump()}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    backgroundColor: '#2196F3',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ↩ {formatLog('ui_return_jump')}
+                </button>
+              )}
+
+              {/* Replay Speed Control (Cycle Button) */}
               <button
-                onClick={() => useGameStore.getState().setLanguage('en')}
+                onClick={() => cycleReplaySpeed()}
                 style={{
-                  background: useGameStore.getState().language === 'en' ? '#fff' : 'none',
-                  color: useGameStore.getState().language === 'en' ? '#000' : '#888',
-                  border: '1px solid #444',
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  backgroundColor: '#ff9800', // Orange
+                  border: 'none',
                   borderRadius: '4px',
+                  color: '#fff',
                   cursor: 'pointer',
-                  fontSize: '10px',
-                  padding: '2px 6px',
-                  fontWeight: useGameStore.getState().language === 'en' ? 'bold' : 'normal',
+                  minWidth: '60px'
                 }}
+                title="Cycle Replay Speed (1-5)"
               >
-                English
+                Speed: x{replaySpeed}
               </button>
-              <button
-                onClick={() => useGameStore.getState().setLanguage('ja')}
-                style={{
-                  background: useGameStore.getState().language === 'ja' ? '#fff' : 'none',
-                  color: useGameStore.getState().language === 'ja' ? '#000' : '#888',
-                  border: '1px solid #444',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  padding: '2px 6px',
-                  fontWeight: useGameStore.getState().language === 'ja' ? 'bold' : 'normal',
-                }}
-              >
-                日本語
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#888' }}>Field:</span>
+                <input
+                  type="color"
+                  value={fieldColor}
+                  onChange={(e) => setFieldColor(e.target.value)}
+                  style={{ width: '20px', height: '20px', border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
+                  title="Change Field Zone Color"
+                />
+              </div>
+
+              {/* Background Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Color Picker */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: '#888' }}>BG:</span>
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    style={{ width: '20px', height: '20px', border: 'none', padding: '0', background: 'none', cursor: 'pointer' }}
+                    title="Change Background Color"
+                  />
+                </div>
+
+                {/* Gradient Toggle */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', color: '#888' }}>
+                  <input
+                    type="checkbox"
+                    checked={useGradient}
+                    onChange={(e) => setUseGradient(e.target.checked)}
+                  />
+                  Gradient
+                </label>
+              </div>
+
+              {/* Language Switch */}
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <button
+                  onClick={() => useGameStore.getState().setLanguage('en')}
+                  style={{
+                    background: useGameStore.getState().language === 'en' ? '#fff' : 'none',
+                    color: useGameStore.getState().language === 'en' ? '#000' : '#888',
+                    border: '1px solid #444',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    fontWeight: useGameStore.getState().language === 'en' ? 'bold' : 'normal',
+                  }}
+                >
+                  English
+                </button>
+                <button
+                  onClick={() => useGameStore.getState().setLanguage('ja')}
+                  style={{
+                    background: useGameStore.getState().language === 'ja' ? '#fff' : 'none',
+                    color: useGameStore.getState().language === 'ja' ? '#000' : '#888',
+                    border: '1px solid #444',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    fontWeight: useGameStore.getState().language === 'ja' ? 'bold' : 'normal',
+                  }}
+                >
+                  日本語
+                </button>
+              </div>
             </div>
           </div>
+
 
           {/* 1. Board Area */}
           <Board />
@@ -288,8 +449,17 @@ export default function Home() {
         </div>
 
         {/* Sidebar Log Area */}
-        {/* Toggle overlay logic via CSS class */}
-        <div className={`log-area ${showMobileLog ? 'open' : ''}`}>
+        {/* PC: Conditional Display. Mobile: Independent 'open' class */}
+        <div
+          className={`log-area ${showLog ? 'open' : ''}`}
+          style={{
+            // PC override: if !showLog, hide it. 
+            // Mobile uses specific CSS classes/media queries, but 'display: none' works generally if we want to hide it.
+            // However, mobile slides it out.
+            // Let's use display: none for PC when closed to reclaim space.
+            display: showLog ? 'flex' : 'none'
+          }}
+        >
           <LogWindow />
         </div>
 
@@ -299,6 +469,46 @@ export default function Home() {
         <DragOverlay>
           {activeCard ? <Card card={activeCard} isOverlay /> : null}
         </DragOverlay>
+
+        {/* Pendulum Summon Cut-in Overlay */}
+        {showPendulumCutIn && (
+          <div style={{
+            position: 'fixed',
+            top: '40%', // Roughly over Monster Zones
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '100%',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            animation: 'fadeInOut 2s ease-in-out forwards'
+          }}>
+            <style jsx>{`
+                    @keyframes fadeInOut {
+                        0% { opacity: 0; letter-spacing: 0.1em; transform: translate(-50%, -50%) scale(0.9); }
+                        20% { opacity: 1; letter-spacing: 0.2em; transform: translate(-50%, -50%) scale(1.0); }
+                        80% { opacity: 1; letter-spacing: 0.2em; transform: translate(-50%, -50%) scale(1.0); }
+                        100% { opacity: 0; letter-spacing: 0.3em; transform: translate(-50%, -50%) scale(1.1); }
+                    }
+                `}</style>
+            <h1 style={{
+              fontSize: '4rem',
+              color: 'rgba(0, 0, 0, 0.6)',
+              fontFamily: 'sans-serif',
+              textTransform: 'uppercase',
+              letterSpacing: '0.2em',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              margin: 0,
+              whiteSpace: 'nowrap',
+              textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
+            }}>
+              PENDULUM SUMMON
+            </h1>
+          </div>
+        )}
       </main>
     </DndContext>
   );

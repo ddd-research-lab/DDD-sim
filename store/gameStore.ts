@@ -428,9 +428,11 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
 
 
                                             // 3. Process Batch
+                                            console.log('c012 Batch End - Pushing History');
                                             useGameStore.setState({ isBatching: false });
                                             finalState.processPendingEffects();
                                             finalState.processUiQueue();
+                                            finalState.pushHistory(); // Ensure snapshot is saved
                                         });
                                     } else {
                                         cs.addLog(formatLog('err_count_surveyor_no_zone'));
@@ -1251,6 +1253,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                     } finally {
                                         useGameStore.setState({ isBatching: false });
                                         store.processUiQueue();
+                                        store.pushHistory();
                                     }
                                 }
                             );
@@ -1734,6 +1737,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                 } finally {
                                     useGameStore.setState({ isBatching: false });
                                     store.processUiQueue();
+                                    store.pushHistory();
                                 }
                             }
                         );
@@ -2123,6 +2127,16 @@ interface GameStore extends GameState {
     resolveZoneSelection: (type: ZoneType, index: number) => void;
 
     // New features
+    setBackgroundColor: (color: string) => void;
+    setFieldColor: (color: string) => void;
+    showPendulumCutIn: boolean;
+    replaySpeed: number;
+    setReplaySpeed: (speed: number) => void;
+    cycleReplaySpeed: () => void;
+    logOrder: 'newest' | 'oldest';
+    toggleLogOrder: () => void;
+    fieldColor: string;
+
     setCardFlag: (cardId: string, flag: string) => void;
     cardFlags: { [cardId: string]: string[] }; // Flags for individual card instances
     triggerCandidates: string[]; // List of card IDs that have pending optional triggers
@@ -2193,7 +2207,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     extraMonsterZones: [null, null],
     lp: 8000,
     normalSummonUsed: false,
-    materials: {},
+    backgroundColor: '#FFFFFF', // Default White
+    fieldColor: 'rgb(80, 80, 80)', // Default R80 G80 B80
+    useGradient: false, // Default No Gradient
+    showPendulumCutIn: false,
+    setBackgroundColor: (color) => set({ backgroundColor: color }),
+    setFieldColor: (color) => set({ fieldColor: color }),
+    setUseGradient: (use) => set({ useGradient: use }),
+    activeDragId: null,
+
+    logOrder: 'newest', // 'newest' (descending indices) or 'oldest' (ascending indices)
+    toggleLogOrder: () => set((state) => ({ logOrder: state.logOrder === 'newest' ? 'oldest' : 'newest' })),
+
     logs: [],
     cards: {},
     turnEffectUsage: {},
@@ -2204,7 +2229,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     cardPropertyModifiers: {}, // Initialize cardPropertyModifiers
 
     isDragging: false,
-    activeDragId: null,
 
     isLinkSummoningActive: false,
     isMaterialMove: false,
@@ -2215,7 +2239,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     lastEffectSourceId: null,
     isReplaying: false,
     isHistoryBatching: false,
-    replaySpeed: 'normal', // Initialize replaySpeed
+    replaySpeed: 1, // Default Speed 1
+    cycleReplaySpeed: () => set((state) => ({ replaySpeed: state.replaySpeed >= 5 ? 1 : state.replaySpeed + 1 })),
     activeEffectCardId: null, // Initialize activeEffectCardId
     originalZoneOrder: null, // Initialize originalZoneOrder
     currentStepIndex: -1, // Initialize currentStepIndex
@@ -2434,6 +2459,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             lp: 8000,
             normalSummonUsed: false,
             materials: {},
+            backgroundColor: '#FFFFFF', // Default White
+            fieldColor: 'rgb(80, 80, 80)', // Default R80 G80 B80
+            useGradient: false, // Default No Gradient
+            // selectedCardForMove: null, // REMOVED
             cardPropertyModifiers: {},
             pendulumSummonLimit: 1, // Default Limit
             pendulumSummonCount: 0,
@@ -4528,6 +4557,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const isFromExtra = state.extraDeck.includes(currentId);
 
             // Calculate valid indices
+            // Trigger Cut-in for Live Play
+            set({ showPendulumCutIn: true });
+            setTimeout(() => set({ showPendulumCutIn: false }), 2000);
+
             let validIndices: { type: ZoneType, index: number }[] = [];
             const emptyMMZs = state.monsterZones.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
 
@@ -4734,35 +4767,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
     },
 
-    toggleReplaySpeed: () => {
-        set((state) => {
-            const speeds: ('slow' | 'normal' | 'fast')[] = ['slow', 'normal', 'fast'];
-            const currentIndex = speeds.indexOf(state.replaySpeed);
-            const nextIndex = (currentIndex + 1) % speeds.length;
-            return { replaySpeed: speeds[nextIndex] };
-        });
-    },
+    setReplaySpeed: (speed) => set({ replaySpeed: speed }),
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
     stopReplay: () => set({ isReplaying: false }),
     replay: async () => {
-        const { history, isReplaying, replaySpeed } = get();
-        if (isReplaying || history.length === 0) return;
+        const { history, replaySpeed } = get();
+        if (get().isReplaying || history.length === 0) return;
 
         set({ isReplaying: true, logs: [], currentStepIndex: -1 });
 
-        // Reset to initial state (approximately) or just start from first snapshot
-        // Ideally we should have an initial snapshot.
-        // For now, we assume history[0] is the start.
+        // Track previous state to detect changes
+        let prevPendulumSummonCount = history[0]?.pendulumSummonCount || 0;
 
         for (let i = 0; i < history.length; i++) {
             if (!get().isReplaying) break; // Allow stop
 
             const snapshot = history[i];
 
-            // Highlight active card if possible (heuristic: check diff or use saved metadata if we had it)
-            // For now, we rely on the state snapshot having 'activeEffectCardId' if we saved it?
-            // Wait, we didn't add it to GameState yet.
-            // And we need to ensure it's captured in the snapshot.
+            // Detect Pendulum Summon
+            if (snapshot.pendulumSummonCount > prevPendulumSummonCount) {
+                // Trigger Cut-in
+                set({ showPendulumCutIn: true });
+                // Wait for cut-in animation (e.g. 2 seconds)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                set({ showPendulumCutIn: false });
+            }
+            prevPendulumSummonCount = snapshot.pendulumSummonCount;
+
 
             set({
                 ...snapshot,
@@ -4779,15 +4810,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 isReplaying: true, // Keep this true during replay
             });
 
-            const delay = replaySpeed === 'slow' ? 1500 : (replaySpeed === 'fast' ? 300 : 800);
+            // Calculate Delay: Base 1000ms / Speed. 
+            // Speed 1 = 1000ms
+            // Speed 5 = 200ms
+            const baseDelay = 1000;
+            const delay = baseDelay / (replaySpeed || 1);
             await new Promise(resolve => setTimeout(resolve, delay));
         }
 
-        set({ isReplaying: false, activeEffectCardId: null });
+        set({ isReplaying: false, activeEffectCardId: null, showPendulumCutIn: false });
     },
 
-    setLanguage: (lang: 'en' | 'ja') => set({ language: lang }),
-    toggleLanguage: () => set((state) => ({ language: state.language === 'en' ? 'ja' : 'en' })),
+    setBackgroundColor: (color: string) => set({ backgroundColor: color }),
+
+    // ... existing actions ...
 
     resolveTrigger: (cardId) => {
         const store = get();
