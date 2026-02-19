@@ -27,6 +27,7 @@ import { formatLog, getCardName } from '@/data/locales';
 export default function Home() {
   const { initializeGame, moveCard, deck, setDeck, cards, activeDragId, setDragState } = useGameStore();
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
+  const [showMobileLog, setShowMobileLog] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -229,26 +230,17 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <main style={{
-        minHeight: '100vh',
-        width: '100vw',
-        position: 'relative',
-        background: 'radial-gradient(circle at center, #1a1a1a, #000)',
-        overflow: 'hidden', // Main container hidden, children scroll
-        display: 'flex',
-        flexDirection: 'row', // Horizontal layout
-      }}>
+      <main className="main-container">
+        {/* Mobile Log Toggle Button */}
+        <button
+          className="log-toggle-btn"
+          onClick={() => setShowMobileLog(!showMobileLog)}
+        >
+          {showMobileLog ? 'Close Log' : 'Log'}
+        </button>
 
         {/* Main Game Area */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '40px 20px',
-          overflowY: 'auto',
-          height: '100vh'
-        }}>
+        <div className="game-area">
           <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{formatLog('ui_title')}</span>
             <div style={{ display: 'flex', gap: '5px' }}>
@@ -296,15 +288,8 @@ export default function Home() {
         </div>
 
         {/* Sidebar Log Area */}
-        <div style={{
-          width: '320px',
-          borderLeft: '1px solid #333',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '20px',
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
+        {/* Toggle overlay logic via CSS class */}
+        <div className={`log-area ${showMobileLog ? 'open' : ''}`}>
           <LogWindow />
         </div>
 

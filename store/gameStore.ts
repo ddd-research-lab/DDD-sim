@@ -4786,6 +4786,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ isReplaying: false, activeEffectCardId: null });
     },
 
+    setLanguage: (lang: 'en' | 'ja') => set({ language: lang }),
+    toggleLanguage: () => set((state) => ({ language: state.language === 'en' ? 'ja' : 'en' })),
+
     resolveTrigger: (cardId) => {
         const store = get();
         if (store.triggerCandidates.includes(cardId)) {
