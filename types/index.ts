@@ -16,6 +16,8 @@ export interface Card {
     linkMarkers?: string[]; // Link Markers e.g. ['BOTTOM_LEFT', 'BOTTOM_RIGHT']
     imageUrl?: string; // For now can be placeholder or local path
     flags?: string[]; // Dynamic flags like 'BANISH_ON_LEAVE'
+    nameJa?: string;
+    descriptionJa?: string;
 }
 
 export type ZoneType = 'DECK' | 'HAND' | 'GRAVEYARD' | 'BANISHED' | 'EXTRA_DECK' | 'MONSTER_ZONE' | 'SPELL_TRAP_ZONE' | 'FIELD_ZONE' | 'MATERIAL' | 'EXTRA_MONSTER_ZONE';
@@ -35,6 +37,7 @@ export interface GameState {
 
     // New State
     lp: number;
+    language: 'en' | 'ja';
     normalSummonUsed: boolean;
     materials: { [hostId: string]: string[] }; // hostId -> list of attached cardIds
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from './Card';
+import { formatLog } from '@/data/locales';
 
 export function SearchModal() {
     const { searchState, resolveSearch, cancelSearch, deck, cards } = useGameStore();
@@ -30,7 +31,7 @@ export function SearchModal() {
             justifyContent: 'center'
         }}>
             <div style={{ marginBottom: '20px', color: '#fff', fontSize: '20px' }}>
-                {searchPrompt || 'Select a Card to Add to Hand'}
+                {searchPrompt || formatLog('ui_select_card_add')}
             </div>
 
             <div style={{
@@ -47,20 +48,20 @@ export function SearchModal() {
                 background: 'rgba(20,20,20,0.9)'
             }}>
                 {validTargets.length === 0 ? (
-                    <div style={{ color: '#aaa' }}>No targets found.</div>
+                    <div style={{ color: '#aaa' }}>{formatLog('ui_no_candidates')}</div>
                 ) : (
                     validTargets.map((id) => {
                         // Determine Location
-                        let loc = 'Unknown';
+                        let loc = formatLog('ui_location_unknown');
                         let color = '#777';
                         const s = useGameStore.getState(); // Fresh state check
-                        if (s.hand.includes(id)) { loc = 'Hand'; color = '#2196F3'; }
-                        else if (s.monsterZones.includes(id) || s.extraMonsterZones.includes(id)) { loc = 'Field (M)'; color = '#4CAF50'; }
-                        else if (s.spellTrapZones.includes(id) || s.fieldZone === id) { loc = 'Field (S/T)'; color = '#8BC34A'; }
-                        else if (s.graveyard.includes(id)) { loc = 'Graveyard'; color = '#9E9E9E'; }
-                        else if (s.banished.includes(id)) { loc = 'Banished'; color = '#F44336'; }
-                        else if (s.extraDeck.includes(id)) { loc = 'Extra Deck'; color = '#673AB7'; }
-                        else if (s.deck.includes(id)) { loc = 'Main Deck'; color = '#FFC107'; }
+                        if (s.hand.includes(id)) { loc = formatLog('ui_location_hand'); color = '#2196F3'; }
+                        else if (s.monsterZones.includes(id) || s.extraMonsterZones.includes(id)) { loc = formatLog('ui_location_field_m'); color = '#4CAF50'; }
+                        else if (s.spellTrapZones.includes(id) || s.fieldZone === id) { loc = formatLog('ui_location_field_st'); color = '#8BC34A'; }
+                        else if (s.graveyard.includes(id)) { loc = formatLog('ui_location_gy'); color = '#9E9E9E'; }
+                        else if (s.banished.includes(id)) { loc = formatLog('ui_location_banished'); color = '#F44336'; }
+                        else if (s.extraDeck.includes(id)) { loc = formatLog('ui_location_extra'); color = '#673AB7'; }
+                        else if (s.deck.includes(id)) { loc = formatLog('ui_location_deck'); color = '#FFC107'; }
 
                         return (
                             <div key={id} onClick={() => resolveSearch(id)} style={{ cursor: 'pointer', transition: 'transform 0.2s', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -84,7 +85,7 @@ export function SearchModal() {
             </div>
 
             <button onClick={cancelSearch} style={{ marginTop: '20px', padding: '10px 20px', cursor: 'pointer', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', fontSize: '16px' }}>
-                Cancel
+                {formatLog('ui_cancel')}
             </button>
         </div>
     );

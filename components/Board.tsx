@@ -4,9 +4,10 @@ import { useGameStore } from '@/store/gameStore';
 import { Card } from './Card';
 import { ExtraDeckModal } from './ExtraDeckModal';
 import { PendulumSummonModal } from './PendulumSummonModal';
+import { formatLog } from '@/data/locales';
 
 export function Board() {
-    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, spellTrapZones: stZones } = useGameStore();
+    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, spellTrapZones: stZones, isReplaying } = useGameStore();
     const isTargeting = targetingState.isOpen;
     const isSelectingZone = zoneSelectionState.isOpen;
     const [showExtra, setShowExtra] = useState(false);
@@ -77,7 +78,7 @@ export function Board() {
                         width: '100%'
                     }}
                 >
-                    Undo
+                    {formatLog('ui_undo')}
                 </button>
 
                 <button
@@ -94,25 +95,25 @@ export function Board() {
                         width: '100%'
                     }}
                 >
-                    Reset Game
+                    {formatLog('ui_reset_game')}
                 </button>
             </div>
 
             {/* Field Zone (Col 1) */}
             <div style={{ gridColumn: '1 / 2', gridRow: '2 / 3' }}>
-                <Zone id="field-zone" type="FIELD_ZONE" label="Field">
+                <Zone id="field-zone" type="FIELD_ZONE" label={formatLog('ui_field')}>
                     {renderCard(fieldZone)}
                 </Zone>
             </div>
 
             {/* Extra Monster Zones (Col 3 and 5) */}
             <div style={{ gridColumn: '3 / 4', gridRow: '1 / 2' }}>
-                <Zone id="emz-1" type="EXTRA_MONSTER_ZONE" index={0} label="EMZ 1">
+                <Zone id="emz-1" type="EXTRA_MONSTER_ZONE" index={0} label={`${formatLog('ui_emz')} 1`}>
                     {renderCard(extraMonsterZones[0])}
                 </Zone>
             </div>
             <div style={{ gridColumn: '5 / 6', gridRow: '1 / 2' }}>
-                <Zone id="emz-2" type="EXTRA_MONSTER_ZONE" index={1} label="EMZ 2">
+                <Zone id="emz-2" type="EXTRA_MONSTER_ZONE" index={1} label={`${formatLog('ui_emz')} 2`}>
                     {renderCard(extraMonsterZones[1])}
                 </Zone>
             </div>
@@ -138,38 +139,52 @@ export function Board() {
                             textShadow: '0 1px 2px black'
                         }}
                     >
-                        PENDULUM SUMMON
+                        {formatLog('ui_pendulum_summon')}
                     </button>
                 </div>
             )}
 
             {/* Banished (Col 7, Row 2 - shifted down) */}
-            <div style={{ gridColumn: '7 / 8', gridRow: '2 / 3', cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer' }}
+            <div style={{
+                gridColumn: '7 / 8',
+                gridRow: '2 / 3',
+                cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
+                boxShadow: (isReplaying && activeEffectCardId && banished.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(0, 255, 255, 0.8)' : 'none',
+                borderRadius: '8px',
+                transition: 'box-shadow 0.3s ease'
+            }}
                 onClick={() => {
                     if (isTargeting || isSelectingZone) return;
                     startSearch(() => true, (cid) => {
                         const store = useGameStore.getState();
                         store.activateEffect(cid);
-                    }, 'Banished Cards', banished);
+                    }, formatLog('ui_banished_zone'), banished);
                 }}
             >
-                <Zone id="banished-zone" type="BANISHED" label="Banished">
+                <Zone id="banished-zone" type="BANISHED" label={formatLog('ui_banished')}>
                     {banished.length > 0 && renderCard(banished[banished.length - 1], false)}
                     {banished.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'blue', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>{banished.length}</div>}
                 </Zone>
             </div>
 
             {/* Graveyard (Col 7, Row 3 - shifted down) */}
-            <div style={{ gridColumn: '7 / 8', gridRow: '3 / 4', cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer' }}
+            <div style={{
+                gridColumn: '7 / 8',
+                gridRow: '3 / 4',
+                cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
+                boxShadow: (isReplaying && activeEffectCardId && graveyard.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(255, 0, 0, 0.8)' : 'none',
+                borderRadius: '8px',
+                transition: 'box-shadow 0.3s ease'
+            }}
                 onClick={() => {
                     if (isTargeting || isSelectingZone) return;
                     startSearch(() => true, (cid) => {
                         const store = useGameStore.getState();
                         store.activateEffect(cid);
-                    }, 'Graveyard Content', graveyard);
+                    }, formatLog('ui_graveyard_zone'), graveyard);
                 }}
             >
-                <Zone id="graveyard-zone" type="GRAVEYARD" label="Graveyard">
+                <Zone id="graveyard-zone" type="GRAVEYARD" label={formatLog('ui_graveyard')}>
                     {graveyard.length > 0 && renderCard(graveyard[graveyard.length - 1], false)}
                     {graveyard.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'red', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>{graveyard.length}</div>}
                 </Zone>
@@ -178,7 +193,7 @@ export function Board() {
             {/* --- Row 2: Monsters (Cols 2-6) --- */}
             {monsterZones.map((cardId, i) => (
                 <div key={`mz-${i}`} style={{ gridColumn: `${2 + i} / ${3 + i}`, gridRow: '2 / 3' }}>
-                    <Zone id={`mz-${i}`} type="MONSTER_ZONE" index={i} label={`Monster ${i + 1}`}>
+                    <Zone id={`mz-${i}`} type="MONSTER_ZONE" index={i} label={formatLog('ui_monster_zone_n', { index: (i + 1).toString() })}>
                         {renderCard(cardId)}
                     </Zone>
                 </div>
@@ -187,13 +202,20 @@ export function Board() {
             {/* --- Row 3: Extra Deck & S/T (Cols 2-6) --- */}
 
             {/* Extra Deck (Col 1, Row 3) */}
-            <div style={{ gridColumn: '1 / 2', gridRow: '3 / 4', cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer' }}
+            <div style={{
+                gridColumn: '1 / 2',
+                gridRow: '3 / 4',
+                cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
+                boxShadow: (isReplaying && activeEffectCardId && extraDeck.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(255, 255, 0, 0.8)' : 'none',
+                borderRadius: '8px',
+                transition: 'box-shadow 0.3s ease'
+            }}
                 onClick={() => {
                     if (isTargeting || isSelectingZone) return;
                     setShowExtra(true);
                 }}
             >
-                <Zone id="extra-deck-zone" type="EXTRA_DECK" label="Extra Deck">
+                <Zone id="extra-deck-zone" type="EXTRA_DECK" label={formatLog('ui_extra_deck')}>
                     {getDeckCount(extraDeck, 'EX')}
                 </Zone>
             </div>

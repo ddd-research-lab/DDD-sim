@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { formatLog } from '@/data/locales';
 
 export function LogWindow() {
-    const { logs, jumpToLog, replay, stopReplay, isReplaying, replaySpeed, toggleReplaySpeed } = useGameStore();
+    const { logs, jumpToLog, replay, stopReplay, isReplaying, replaySpeed, toggleReplaySpeed, jumpHistory, returnFromJump } = useGameStore();
     const [isAscending, setIsAscending] = useState(true);
 
     const displayedLogs = isAscending
@@ -27,7 +28,7 @@ export function LogWindow() {
             flexDirection: 'column',
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #555', paddingBottom: '5px', marginBottom: '5px' }}>
-                <h3 style={{ margin: 0 }}>Duel Log</h3>
+                <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
                 <div style={{ display: 'flex', gap: '5px' }}>
                     {isReplaying ? (
                         <button
@@ -42,7 +43,7 @@ export function LogWindow() {
                                 cursor: 'pointer',
                             }}
                         >
-                            ■ Stop
+                            ■ {formatLog('ui_stop')}
                         </button>
                     ) : (
                         <button
@@ -59,7 +60,24 @@ export function LogWindow() {
                                 opacity: logs.length === 0 ? 0.5 : 1
                             }}
                         >
-                            ▶ Replay
+                            ▶ {formatLog('ui_replay')}
+                        </button>
+                    )}
+
+                    {jumpHistory && jumpHistory.length > 0 && (
+                        <button
+                            onClick={() => returnFromJump()}
+                            style={{
+                                padding: '2px 8px',
+                                fontSize: '10px',
+                                backgroundColor: '#2196F3', // Blue
+                                border: 'none',
+                                borderRadius: '4px',
+                                color: '#fff',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            ↩ {formatLog('ui_return_jump')}
                         </button>
                     )}
 
@@ -93,7 +111,7 @@ export function LogWindow() {
                             cursor: 'pointer',
                         }}
                     >
-                        {isAscending ? '↓New' : '↑Old'}
+                        {isAscending ? formatLog('ui_new') : formatLog('ui_old')}
                     </button>
                 </div>
             </div>

@@ -1,7 +1,9 @@
+import { ComponentType } from 'react';
 import React from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from '@/components/Card';
 import { Card as CardType } from '@/types';
+import { formatLog, getCardName } from '@/data/locales';
 
 interface ExtraDeckModalProps {
     isOpen: boolean;
@@ -9,7 +11,7 @@ interface ExtraDeckModalProps {
 }
 
 export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
-    const { extraDeck, cards, monsterZones, spellTrapZones, graveyard, fieldZone, moveCard, addLog, startSynchroSummon, banished, extraMonsterZones } = useGameStore();
+    const { extraDeck, cards, monsterZones, spellTrapZones, graveyard, fieldZone, moveCard, addLog, startSynchroSummon, banished, extraMonsterZones, language } = useGameStore();
 
     // State for selected card ID (for +/- buttons) - Must be before early return
     const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
@@ -174,7 +176,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
             // 1. Confirm & Close Modal
             onClose();
-            addLog(`Link Summon Sequence initiated for ${card.name}.`);
+            addLog(formatLog('log_link_init', { card: getCardName(card, language) }));
 
             // 2. Select Materials First
             useGameStore.getState().clearSelectedCards(); // Reset
@@ -188,7 +190,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                     return;
                 }
 
-                addLog(`Select Material ${mats.length + 1}/${requiredMaterials} (DD Monster).`);
+
 
                 startTargeting(
                     (tCard) => {
@@ -224,7 +226,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 const restrictToEMZ = isZeusRagnarok && materialInEMZ;
 
                 store.startZoneSelection(
-                    'Select Zone for Link Summon (EMZ or Linked Zone)',
+                    formatLog('prompt_select_zone_link'),
                     (type, index) => {
                         // Logic:
                         // 1. Any Empty EMZ is valid.
@@ -329,7 +331,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 console.error("startXyzSummon not implemented in store yet");
             }
         } else {
-            addLog(`Clicked Extra Deck Card: ${cards[cardId].name}`);
+            addLog(formatLog('log_extra_deck_click', { card: getCardName(cards[cardId], language) }));
         }
     };
 
@@ -345,10 +347,10 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             // P-Rule: Field P-Monster -> Extra Deck Face-Up
             if (c.subType?.includes('PENDULUM')) {
                 moveCard(id, 'EXTRA_DECK');
-                addLog(`Material ${c.name} added to Extra Deck (Face-Up).`);
+                addLog(formatLog('log_material_to_extra', { card: getCardName(c, useGameStore.getState().language) }));
             } else {
                 moveCard(id, 'GRAVEYARD');
-                addLog(`Material ${c.name} sent to GY.`);
+                addLog(formatLog('log_material_to_gy', { card: getCardName(c, useGameStore.getState().language) }));
             }
         });
 
@@ -358,7 +360,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         // 2. Summon Link Monster
         moveCard(linkCardId, zoneType, zoneIndex, undefined, false, true);
         const freshCards = useGameStore.getState().cards;
-        addLog(`Link Summoned ${freshCards[linkCardId].name} to Zone.`);
+
 
         useGameStore.getState().clearSelectedCards(); // Cleanup
     };
@@ -366,13 +368,14 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
     // Arc Crisis Summon Logic
     const startArcCrisisSummon = (arcCrisisId: string) => {
         const store = useGameStore.getState();
-        store.addLog('Arc Crisis: Select 4 monsters to banish (Fusion, Synchro, Xyz, Pendulum)');
+        store.addLog(formatLog('log_arc_crisis_init'));
 
         // Collect candidates from field (Monsters + P-Zones) and graveyard
         const fieldMonsterIds = [...store.monsterZones, ...store.extraMonsterZones].filter((id): id is string => id !== null);
         const pZoneIds = [store.spellTrapZones[0], store.spellTrapZones[4]].filter((id): id is string => id !== null);
         const gyMonsterIds = store.graveyard.filter(id => store.cards[id]?.type === 'MONSTER');
         const allCandidates = [...fieldMonsterIds, ...pZoneIds, ...gyMonsterIds];
+
 
         const requirements = ['FUSION', 'SYNCHRO', 'XYZ', 'PENDULUM'];
         const selectedMaterials: string[] = [];
@@ -397,14 +400,14 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             const currentStore = useGameStore.getState();
             const remainingReqs = requirements.filter(r => !usedRequirements.has(r));
             const reqLabels = remainingReqs.map(r => {
-                if (r === 'FUSION') return '融合';
-                if (r === 'SYNCHRO') return 'シンクロ';
-                if (r === 'XYZ') return 'エクシーズ';
-                if (r === 'PENDULUM') return 'ペンデュラム';
+                if (r === 'FUSION') return formatLog('label_fusion');
+                if (r === 'SYNCHRO') return formatLog('label_synchro');
+                if (r === 'XYZ') return formatLog('label_xyz');
+                if (r === 'PENDULUM') return formatLog('label_pendulum');
                 return r;
             }).join('/');
 
-            currentStore.addLog(`Select Material ${selectedMaterials.length + 1}/4 (Remaining: ${reqLabels})`);
+            currentStore.addLog(formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: reqLabels }));
 
             // Filter valid candidates
             const validCandidates = allCandidates.filter(id => {
@@ -414,7 +417,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             });
 
             if (validCandidates.length === 0) {
-                currentStore.addLog('Cannot complete Arc Crisis summon: No valid materials remaining.');
+                currentStore.addLog(formatLog('log_arc_crisis_fail'));
                 currentStore.clearSelectedCards();
                 return;
             }
@@ -430,8 +433,8 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                     selectNextMaterial();
                 } else {
                     currentStore.startEffectSelection(
-                        `${selectedCard.name}をどちらとして扱いますか？`,
-                        possibleReqs.map(r => ({ label: r === 'XYZ' ? 'エクシーズ' : 'ペンデュラム', value: r })),
+                        formatLog('prompt_treat_as', { card: selectedCard.name }),
+                        possibleReqs.map(r => ({ label: r === 'XYZ' ? formatLog('label_xyz') : formatLog('label_pendulum'), value: r })),
                         (assignedReq) => {
                             usedRequirements.add(assignedReq);
                             selectedMaterials.push(selectedId);
@@ -453,7 +456,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             currentStore.startSearch(
                 (c) => validCandidates.includes(c.id),
                 (sid) => selectMaterialById(sid),
-                `素材を選択 (${selectedMaterials.length + 1}/4)`,
+                formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: (selectedMaterials.length + 1).toString() }), // Re-using existing if feasible or generalize
                 [...allFieldIds, ...currentStore.graveyard]
             );
         };
@@ -473,13 +476,13 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         const emptyEMZ = store.extraMonsterZones.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
 
         if (emptyMZ.length === 0 && emptyEMZ.length === 0) {
-            store.addLog('No empty zones for Arc Crisis.');
+            store.addLog(formatLog('log_arc_crisis_no_zone'));
             store.clearSelectedCards();
             return;
         }
 
         store.startZoneSelection(
-            'Arc Crisisを召喚するゾーンを選択',
+            formatLog('prompt_select_zone'),
             (type, index) => {
                 if (type === 'EXTRA_MONSTER_ZONE') {
                     const occupant = store.extraMonsterZones[index];
@@ -544,7 +547,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 // Banish all materials
                 materialIds.forEach(id => {
                     finalStore.moveCard(id, 'BANISHED');
-                    finalStore.addLog(`Banished ${finalStore.cards[id].name}.`);
+                    finalStore.addLog(formatLog('log_banished', { card: getCardName(finalStore.cards[id], finalStore.language) }));
                 });
 
                 // Reset material move flag
@@ -552,7 +555,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
                 // Summon Arc Crisis
                 finalStore.moveCard(arcCrisisId, type, index, undefined, false, true);
-                finalStore.addLog('Special Summoned DDDD Dimensional King Arc Crisis!');
+
 
                 finalStore.clearSelectedCards();
 
@@ -584,7 +587,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             .filter((id): id is string => id !== null && store.cards[id].name.includes('DDD')).length;
 
         if (dddCount === 0) {
-            store.addLog('Alfred effect: No DDD monsters on field.');
+            store.addLog(formatLog('log_alfred_no_ddd'));
             return;
         }
 
@@ -596,19 +599,19 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         });
 
         if (contractCandidates.length === 0) {
-            store.addLog('Alfred effect: No Dark Contract cards in GY/Banished.');
+            store.addLog(formatLog('log_alfred_no_contract'));
             return;
         }
 
         store.startEffectSelection(
-            `Alfred: Place up to ${dddCount} Dark Contract(s) from GY/Banished?`,
-            [{ label: 'Yes', value: 'yes' }, { label: 'No', value: 'no' }],
+            formatLog('prompt_activate_effect', { name: 'Alfred' }),
+            [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
             (choice) => {
                 if (choice === 'yes') {
                     const placedCount = { count: 0 };
                     const placeNextContract = () => {
                         if (placedCount.count >= dddCount) {
-                            useGameStore.getState().addLog(`Alfred effect: Placed ${placedCount.count} Dark Contract(s).`);
+                            useGameStore.getState().addLog(formatLog('log_alfred_placed_count', { count: placedCount.count.toString() }));
                             return;
                         }
 
@@ -620,19 +623,19 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                         });
 
                         if (remaining.length === 0) {
-                            s.addLog(`Alfred effect: Placed ${placedCount.count} Dark Contract(s).`);
+                            s.addLog(formatLog('log_alfred_placed_card', { count: placedCount.count.toString() }));
                             return;
                         }
 
                         s.startEffectSelection(
-                            `Select Dark Contract to place (${placedCount.count + 1}/${dddCount}) or Done`,
+                            formatLog('prompt_select_card'),
                             [
                                 ...remaining.map(id => ({ label: s.cards[id].name, value: id, imageUrl: s.cards[id].imageUrl })),
-                                { label: 'Done', value: 'done' }
+                                { label: formatLog('ui_done'), value: 'done' }
                             ],
                             (selected) => {
                                 if (selected === 'done') {
-                                    useGameStore.getState().addLog(`Alfred effect: Placed ${placedCount.count} Dark Contract(s).`);
+                                    useGameStore.getState().addLog(formatLog('log_alfred_placed_count', { count: placedCount.count.toString() }));
                                     return;
                                 }
 
@@ -642,11 +645,11 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
                                 if (emptySTIdx !== -1) {
                                     s2.moveCard(selected, 'SPELL_TRAP_ZONE', emptySTIdx);
-                                    s2.addLog(`Placed ${s2.cards[selected].name} from Alfred's effect.`);
+                                    s2.addLog(formatLog('log_alfred_placed_card', { card: getCardName(s2.cards[selected], s2.language) }));
                                     placedCount.count++;
                                     placeNextContract();
                                 } else {
-                                    s2.addLog('No empty S/T zones.');
+                                    s2.addLog(formatLog('log_alfred_no_zone'));
                                 }
                             }
                         );
@@ -698,7 +701,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 border: '1px solid #444',
                 boxShadow: '0 0 20px rgba(0,0,0,0.8)'
             }} onClick={e => e.stopPropagation()}>
-                <h3 style={{ marginTop: 0, color: '#ddd' }}>Extra Deck</h3>
+                <h3 style={{ marginTop: 0, color: '#ddd' }}>{formatLog('ui_extra_deck')}</h3>
 
                 {/* Copy Management Bar - Only for initial cards */}
                 {selectedCardId && isInitialCard(selectedCardId) && (
@@ -712,7 +715,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                         borderRadius: '6px'
                     }}>
                         <span style={{ color: '#fff' }}>
-                            {cards[extraDeck.find(id => cards[id].cardId === selectedCardId) || '']?.name}: {getCopyCount(selectedCardId)} copies
+                            {getCardName(cards[extraDeck.find(id => cards[id].cardId === selectedCardId) || ''], language)}: {getCopyCount(selectedCardId)} {formatLog('ui_copies')}
                         </span>
                         <button
                             onClick={() => handleRemoveCopy(selectedCardId)}
@@ -811,7 +814,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                             </div>
                         );
                     })}
-                    {extraDeck.length === 0 && <span style={{ color: '#666' }}>Extra Deck Empty</span>}
+                    {extraDeck.length === 0 && <span style={{ color: '#666' }}>{formatLog('ui_extra_deck_empty')}</span>}
                 </div>
                 <button onClick={onClose} style={{
                     marginTop: '20px',
@@ -822,7 +825,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                     cursor: 'pointer',
                     borderRadius: '4px'
                 }}>
-                    Close
+                    {formatLog('ui_close')}
                 </button>
             </div>
         </div>

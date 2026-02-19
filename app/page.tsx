@@ -22,6 +22,7 @@ import { CARD_DATABASE } from '@/data/cards';
 import { Card as CardType, ZoneType } from '@/types';
 import { DeckArea } from '@/components/DeckArea';
 import { EffectSelectionModal } from '@/components/EffectSelectionModal';
+import { formatLog, getCardName } from '@/data/locales';
 
 export default function Home() {
   const { initializeGame, moveCard, deck, setDeck, cards, activeDragId, setDragState } = useGameStore();
@@ -185,7 +186,7 @@ export default function Home() {
       // Rule: Block Hand to EMZ (Extra Deck monsters only)
       if (fromHand && zoneType === 'EXTRA_MONSTER_ZONE') {
         console.warn('Cannot Summon from Hand to EMZ.');
-        store.addLog('Cannot Summon from Hand to Extra Monster Zone.');
+        store.addLog(formatLog('log_error_hand_to_emz'));
         setDragState(false, null);
         setActiveCard(null);
         return;
@@ -219,7 +220,7 @@ export default function Home() {
 
   };
 
-  if (!deck) return <div>Loading...</div>;
+  if (!deck) return <div>{formatLog('ui_loading')}</div>;
 
   return (
     <DndContext
@@ -248,8 +249,40 @@ export default function Home() {
           overflowY: 'auto',
           height: '100vh'
         }}>
-          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px' }}>
-            Yu-Gi-Oh! Simulator (Solo)
+          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{formatLog('ui_title')}</span>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button
+                onClick={() => useGameStore.getState().setLanguage('en')}
+                style={{
+                  background: useGameStore.getState().language === 'en' ? '#fff' : 'none',
+                  color: useGameStore.getState().language === 'en' ? '#000' : '#888',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  fontWeight: useGameStore.getState().language === 'en' ? 'bold' : 'normal',
+                }}
+              >
+                English
+              </button>
+              <button
+                onClick={() => useGameStore.getState().setLanguage('ja')}
+                style={{
+                  background: useGameStore.getState().language === 'ja' ? '#fff' : 'none',
+                  color: useGameStore.getState().language === 'ja' ? '#000' : '#888',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  fontWeight: useGameStore.getState().language === 'ja' ? 'bold' : 'normal',
+                }}
+              >
+                日本語
+              </button>
+            </div>
           </div>
 
           {/* 1. Board Area */}

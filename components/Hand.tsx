@@ -2,6 +2,7 @@ import React from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { Card } from './Card';
 import { useGameStore } from '@/store/gameStore';
+import { formatLog } from '@/data/locales';
 
 export function Hand() {
     const { hand, cards } = useGameStore();
@@ -30,7 +31,7 @@ export function Hand() {
                 marginTop: '20px'
             }}
         >
-            {hand.length === 0 && <span style={{ color: '#555', fontSize: '12px' }}>Hand Empty</span>}
+            {hand.length === 0 && <span style={{ color: '#555', fontSize: '12px' }}>{formatLog('ui_hand_empty')}</span>}
             {hand.map((cardId) => {
                 const card = cards[cardId];
                 if (!card) return null;

@@ -7,6 +7,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Zone } from './Zone';
+import { formatLog, getCardName } from '@/data/locales';
 
 interface SortableCardProps {
   id: string;
@@ -60,8 +61,8 @@ function SortableCard({ id, card, index, isSelected, onSelect }: SortableCardPro
       }}
     >
       <img
-        src={card.imageUrl || 'https://via.placeholder.com/80x116?text=' + card.name}
-        alt={card.name}
+        src={card.imageUrl || 'https://via.placeholder.com/80x116?text=' + getCardName(card as any, useGameStore.getState().language)}
+        alt={getCardName(card as any, useGameStore.getState().language)}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
       <div style={{
@@ -94,7 +95,7 @@ export function DeckArea() {
       useGameStore.setState((state) => ({
         deck: state.deck.filter(id => id !== selectedId),
         hand: [...state.hand, selectedId],
-        logs: [`Drew ${cards[selectedId].name} (selected).`, ...state.logs]
+        logs: [formatLog('log_search_deck', { card: getCardName(cards[selectedId], useGameStore.getState().language) }), ...state.logs]
       }));
       setSelectedId(null);
     } else {
@@ -129,7 +130,7 @@ export function DeckArea() {
           alignItems: 'center',
           gap: '12px'
         }}>
-          <h3 style={{ margin: 0, color: '#ed6c02', fontSize: '18px', letterSpacing: '1px' }}>MAIN DECK</h3>
+          <h3 style={{ margin: 0, color: '#ed6c02', fontSize: '18px', letterSpacing: '1px' }}>{formatLog('ui_main_deck')}</h3>
           <span style={{
             background: '#ed6c02',
             color: 'white',
@@ -138,7 +139,7 @@ export function DeckArea() {
             fontSize: '12px',
             fontWeight: 'bold'
           }}>
-            {deck.length} Cards
+            {deck.length} {formatLog('ui_copies')}
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); shuffleDeck(); }}
@@ -155,7 +156,7 @@ export function DeckArea() {
               opacity: (deck.length <= 1 || isTargeting || isSelectingZone) ? 0.5 : 1
             }}
           >
-            SHUFFLE
+            {formatLog('ui_shuffle')}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); sortDeck(); }}
@@ -172,7 +173,7 @@ export function DeckArea() {
               opacity: (deck.length <= 1 || isTargeting || isSelectingZone) ? 0.5 : 1
             }}
           >
-            SORT
+            {formatLog('ui_sort')}
           </button>
         </div>
 
@@ -223,12 +224,12 @@ export function DeckArea() {
               boxShadow: '0 0 10px rgba(237, 108, 2, 0.4)'
             }}
           >
-            DRAW
+            {formatLog('ui_draw')}
           </button>
         </div>
       </div>
 
-      <Zone id="deck-zone" type="DECK" label="Main Deck Area" style={{ width: '100%', height: 'auto', minHeight: '140px', margin: 0 }}>
+      <Zone id="deck-zone" type="DECK" label={formatLog('ui_main_deck_area')} style={{ width: '100%', height: 'auto', minHeight: '140px', margin: 0 }}>
         <div style={{
           display: 'flex',
           flexDirection: 'row',
@@ -265,7 +266,7 @@ export function DeckArea() {
               fontStyle: 'italic',
               gap: '10px'
             }}>
-              <span>No cards remaining in deck</span>
+              <span>{formatLog('ui_no_deck_cards')}</span>
               <button
                 onClick={() => window.location.reload()}
                 style={{
@@ -278,7 +279,7 @@ export function DeckArea() {
                   cursor: 'pointer'
                 }}
               >
-                Reload Page
+                {formatLog('ui_reload_page')}
               </button>
             </div>
           )}

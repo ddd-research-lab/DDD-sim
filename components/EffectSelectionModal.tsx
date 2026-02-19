@@ -16,7 +16,7 @@ export function EffectSelectionModal() {
             left: 0,
             width: '100%',
             height: '100%',
-            backgroundColor: 'rgba(0,0,0,0.85)',
+            backgroundColor: 'rgba(0,0,0,0.5)',
             backdropFilter: 'blur(10px)',
             zIndex: 2000,
             display: 'flex',

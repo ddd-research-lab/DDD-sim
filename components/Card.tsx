@@ -3,6 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { Card as CardType } from '@/types';
 import { useGameStore } from '@/store/gameStore';
+import { formatLog, getCardName } from '@/data/locales';
 import { motion } from 'framer-motion';
 
 interface CardProps {
@@ -69,7 +70,6 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
         }
 
         if (zoneSelectionState.isOpen) {
-            store.addLog('Please select a Zone, not a card.');
             return;
         }
 
@@ -154,7 +154,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                 transform: CSS.Translate.toString(transform),
             }}
             // Only animate scale/shadow if replaying and active. Do NOT animate transform or layout here.
-            animate={activeEffectCardId === card.id ? {
+            animate={isReplaying && activeEffectCardId === card.id ? {
                 boxShadow: ["0px 0px 0px 0px rgba(0, 255, 0, 0)", "0px 0px 20px 10px rgba(0, 255, 0, 0.8)", "0px 0px 0px 0px rgba(0, 255, 0, 0)"],
                 scale: [1, 1.1, 1],
                 borderColor: ["#444", "#00ff00", "#444"],
@@ -187,11 +187,13 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             ) : (
                 <>
                     <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '9px', lineHeight: '1.1' }}>
-                        {card.name}
+                        {getCardName(card, useGameStore.getState().language)}
                     </div>
                     <div style={{ fontSize: '8px', overflow: 'hidden', height: '100%', wordBreak: 'break-all' }}>
                         {/* Image placeholder or simplified view */}
-                        {card.type}
+                        {card.type === 'MONSTER' ? formatLog('label_monster') :
+                            card.type === 'SPELL' ? formatLog('label_spell') :
+                                card.type === 'TRAP' ? formatLog('label_trap') : card.type}
                     </div>
                 </>
             )}

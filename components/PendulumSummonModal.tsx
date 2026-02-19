@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from './Card';
+import { formatLog } from '@/data/locales';
 
 export function PendulumSummonModal() {
     const { isPendulumSummoning, isPendulumProcessing, pendulumCandidates, resolvePendulumSelection, cancelPendulumSummon, cards } = useGameStore();
@@ -37,10 +38,10 @@ export function PendulumSummonModal() {
             justifyContent: 'center'
         }}>
             <div style={{ marginBottom: '20px', color: '#fff', fontSize: '24px', fontWeight: 'bold' }}>
-                Pendulum Summon Selection
+                {formatLog('ui_pendulum_summon_selection')}
             </div>
             <div style={{ marginBottom: '10px', color: '#ccc', fontSize: '16px' }}>
-                Select monsters to Special Summon simultaneously.
+                {formatLog('ui_pendulum_summon_instruction')}
             </div>
 
             <div style={{
@@ -57,7 +58,7 @@ export function PendulumSummonModal() {
                 background: 'rgba(20,20,20,0.9)'
             }}>
                 {pendulumCandidates.length === 0 ? (
-                    <div style={{ color: '#aaa' }}>No candidates found.</div>
+                    <div style={{ color: '#aaa' }}>{formatLog('ui_no_candidates')}</div>
                 ) : (
                     pendulumCandidates.map((id) => {
                         const isSelected = selectedIds.includes(id);
@@ -115,7 +116,7 @@ export function PendulumSummonModal() {
                         boxShadow: selectedIds.length > 0 ? '0 0 15px rgba(0, 255, 242, 0.4)' : 'none'
                     }}
                 >
-                    Summon Selected ({selectedIds.length})
+                    {formatLog('ui_summon_selected', { count: selectedIds.length.toString() })}
                 </button>
 
                 <button
@@ -130,7 +131,7 @@ export function PendulumSummonModal() {
                         fontSize: '18px'
                     }}
                 >
-                    Cancel
+                    {formatLog('ui_cancel')}
                 </button>
             </div>
         </div>

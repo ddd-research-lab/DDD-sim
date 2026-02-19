@@ -15,7 +15,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 0,
         level: 1,
         scale: 10,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205042.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205042.png',
+        nameJa: 'DD魔導賢者ケプラー',
+        descriptionJa: '【Ｐスケール：青１０/赤１０】\n(1)：自分メインフェイズに発動できる。このカードのＰスケールをターン終了時まで５にする。\n【モンスター効果】\nこのカード名の(1)のモンスター効果は１ターンに１度しか使用できない。\n(1)：このカードが召喚・特殊召喚に成功した場合、以下の効果から１つを選択して発動できる。\n●このカード以外の自分フィールドの「DD」カード１枚を対象として発動できる。そのカードを手札に戻す。\n●デッキから「契約書」カード１枚を手札に加える。'
     },
     'c009': {
         cardId: 'c009',
@@ -27,7 +29,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 0,
         level: 4,
         scale: 1,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205111.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205111.png',
+        nameJa: 'DD魔導賢者コペルニクス',
+        descriptionJa: '【Ｐスケール：青１/赤１】\n(1)：自分は「DD」モンスターしかＰ召喚できない。この効果は無効化されない。\n(2)：このカードがＰゾーンに存在する限り１度だけ、自分にダメージを与える魔法カードの効果が発動した場合、その効果を無効にできる。その後、このカードを破壊する。\n【モンスター効果】\nこのカード名の(1)のモンスター効果は１ターンに１度しか使用できない。\n(1)：このカードが召喚・特殊召喚に成功した場合に発動できる。デッキから「DD」カードまたは「契約書」カード１枚を墓地へ送る。'
     },
     'c005': {
         cardId: 'c005',
@@ -35,7 +39,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'SPELL',
         subType: 'CONTINUOUS',
         description: 'During your main phase: You can add 1 DD monster from Deck to Hand.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230459.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230459.png',
+        nameJa: '地獄門の契約書',
+        descriptionJa: 'このカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：自分メインフェイズに発動できる。デッキから「DD」モンスター１体を手札に加える。\n(2)：自分スタンバイフェイズに発動する。自分は１０００ダメージを受ける。'
     },
     'c006': {
         cardId: 'c006',
@@ -43,7 +49,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'SPELL',
         subType: 'CONTINUOUS',
         description: '[1] Main Phase: Fusion Summon 1 Fiend Fusion Monster using material from hand/field. If Summoning "DD", can also banish material from GY.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230251.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230251.png',
+        nameJa: '魔神王の契約書',
+        descriptionJa: 'このカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：自分メインフェイズに発動できる。自分の手札・フィールドから、悪魔族の融合モンスターカードによって決められた融合素材モンスターを墓地へ送り、その融合モンスター１体をＥＸデッキから融合召喚する。「DD」融合モンスターを融合召喚する場合、自分の墓地のモンスターを除外して融合素材とする事もできる。\n(2)：自分スタンバイフェイズに発動する。自分は１０００ダメージを受ける。'
     },
     'c007': {
         cardId: 'c007',
@@ -54,7 +62,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2000,
         defense: 1500,
         level: 6,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232418.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232418.png',
+        nameJa: 'DDD烈火王テムジン',
+        descriptionJa: '「DD」モンスター×２\nこのカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：このカードがモンスターゾーンに存在し、自分フィールドに元々の攻撃力以外の攻撃力を持つ「DD」モンスターが特殊召喚された場合、自分の墓地の「DD」モンスター１体を対象として発動できる。そのモンスターを特殊召喚する。\n(2)：このカードが戦闘または相手の効果で破壊された場合、自分の墓地の「契約書」カード１枚を対象として発動できる。そのカードを手札に加える。'
     },
     'c008': {
         cardId: 'c008',
@@ -66,7 +76,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 3000,
         level: 8,
         scale: 5,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314225718.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314225718.png',
+        nameJa: 'DDD壊薙王アビス・ラグナロク',
+        descriptionJa: '【Ｐスケール：青５/赤５】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：自分が「DD」モンスターを特殊召喚した場合、自分の墓地の「DD」モンスター１体を対象として発動できる。そのモンスターを特殊召喚し、自分は１０００ダメージを受ける。このターン、相手が受ける戦闘ダメージは半分になる。\n【モンスター効果】\nこのカード名の(1)のモンスター効果は１ターンに１度しか使用できない。\n(1)：このカードが召喚・特殊召喚に成功した場合、自分の墓地の「DDD」モンスター１体を対象として発動できる。そのモンスターを特殊召喚する。\n(2)：１ターンに１度、このカード以外の自分フィールドの「DD」モンスター１体をリリースし、相手フィールドのモンスター１体を対象として発動できる。そのモンスターを除外する。'
     },
     'c010': {
         cardId: 'c010',
@@ -78,7 +90,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 2600,
         level: 8,
         scale: 6,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230158.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230158.png',
+        nameJa: 'DD魔導賢者トーマス',
+        descriptionJa: '【Ｐスケール：青６/赤６】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：自分メインフェイズに発動できる。自分のＥＸデッキから表側表示の「DD」Ｐモンスター１体を手札に加える。\n【モンスター効果】\nこのカード名のモンスター効果は１ターンに１度しか使用できない。\n(1)：自分のＰゾーンの「DD」カード１枚を対象として発動できる。そのカードを破壊し、デッキからレベル８の「DDD」モンスター１体を守備表示で特殊召喚する。この効果で特殊召喚したモンスターの効果は無効化され、このターンのエンドフェイズに破壊される。'
     },
     'c011': {
         cardId: 'c011',
@@ -90,7 +104,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 1800,
         level: 4,
         scale: 3,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205154.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314205154.png',
+        nameJa: 'DDオルトロス',
+        descriptionJa: '【Ｐスケール：青３/赤３】\n(1)：１ターンに１度、フィールドの魔法・罠カード１枚と、このカード以外の自分フィールドの「DD」カードまたは「契約書」カード１枚を対象として発動できる。そのカードを破壊する。\n【モンスター効果】\n(1)：自分が戦闘・効果でダメージを受けた時に発動できる。このカードを手札から特殊召喚する。\n(2)：このカードが特殊召喚に成功したターン、自分は悪魔族モンスターしか特殊召喚できない。'
     },
     'c012': {
         cardId: 'c012',
@@ -102,7 +118,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 2000,
         level: 8,
         scale: 1,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232712.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232712.png',
+        nameJa: 'DDカウント・サーベイヤー',
+        descriptionJa: '【Ｐスケール：青１/赤１】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：自分メインフェイズに発動できる。手札の「DD」Ｐモンスター以外の「DD」モンスターまたは「契約書」カードを合計２枚相手に見せ、このカードを特殊召喚する。この効果で特殊召喚したこのカードのレベルは４になる。\n【モンスター効果】\nこのカード名の(1)(2)のモンスター効果はそれぞれ１ターンに１度しか使用できない。\n(1)：手札から他の「DD」モンスター１体を捨てて発動できる。このカードを手札から特殊召喚する。\n(2)：このカードが召喚・特殊召喚に成功した場合に発動できる。デッキから攻撃力または守備力が０の「DD」モンスター１体を手札に加える。'
     },
     'c013': {
         cardId: 'c013',
@@ -114,7 +132,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 1200,
         level: 4,
         scale: 1,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314225644.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314225644.png',
+        nameJa: 'DDグリフォン',
+        descriptionJa: '【Ｐスケール：青１/赤１】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：自分フィールドの悪魔族モンスター１体を対象として発動できる。そのモンスターの攻撃力をターン終了時まで５００アップする。その後、このカードを破壊する。\n【モンスター効果】\nこのカード名の(1)(2)(3)のモンスター効果はそれぞれ１ターンに１度しか使用できない。\n(1)：自分フィールドに「DD」モンスターが存在する場合に発動できる。このカードを手札から守備表示で特殊召喚する。\n(2)：このカードがＰ召喚に成功した場合、手札から「DD」カードまたは「契約書」カード１枚を捨てて発動できる。自分はデッキから１枚ドローする。\n(3)：このカードが墓地からの特殊召喚に成功した場合に発動できる。デッキから「DD」カード１枚を手札に加える。'
     },
     'c014': {
         cardId: 'c014',
@@ -126,7 +146,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 1000,
         level: 2,
         scale: 9,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232508.jpg'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314232508.jpg',
+        nameJa: 'DDスケール・サーベイヤー',
+        descriptionJa: '【Ｐスケール：青９/赤９】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：自分・相手のスタンバイフェイズに、お互いのＰゾーンのカードを１枚ずつ対象として発動できる。そのカードのＰスケールをターン終了時まで０にする。\n【モンスター効果】\nこのカード名の(1)(2)(3)のモンスター効果はそれぞれ１ターンに１度しか使用できない。\n(1)：自分フィールドに「DD」Ｐモンスターカードが存在する場合に発動できる。このカードを手札から特殊召喚する。\n(2)：このカードが召喚・特殊召喚に成功した場合に発動できる。このカードのレベルを４にする。\n(3)：このカードが墓地へ送られた場合、またはＥＸデッキに表側表示で加わった場合、自分フィールドの「DD」Ｐモンスターカード１枚を対象として発動できる。そのカードを手札に戻す。'
     },
     'c015': {
         cardId: 'c015',
@@ -137,7 +159,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 300,
         defense: 300,
         level: 1,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314203249.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314203249.png',
+        nameJa: 'DDネクロ・スライム',
+        descriptionJa: 'このカード名の効果は１ターンに１度しか使用できない。\n(1)：このカードが墓地に存在する場合に発動できる。自分の墓地から、このカードを含む「DDD」融合モンスターによって決められた融合素材モンスターを除外し、その融合モンスター１体をＥＸデッキから融合召喚する。'
     },
     'c016': {
         cardId: 'c016',
@@ -145,7 +169,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'TRAP',
         subType: 'CONTINUOUS',
         description: '[1] Send 1 "DD" or "Dark Contract" from Hand to GY, Target 1 card; Destroy it. [2] Fiends gain 1000 ATK during opp turn.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250325/20250325170033.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250325/20250325170033.png',
+        nameJa: '魔神王の契約書',
+        descriptionJa: 'このカード名の(1)(2)の効果はそれぞれ１ターンに１度しか使用できない。\n(1)：手札から「DD」カードまたは「契約書」カード１枚を墓地へ送り、フィールドのカード１枚を対象として発動できる。そのカードを破壊する。\n(2)：自分フィールドの悪魔族モンスターの攻撃力は、相手ターン中１０００アップする。\n(3)：自分スタンバイフェイズに発動する。自分は１０００ダメージを受ける。'
     },
     'c017': {
         cardId: 'c017',
@@ -157,7 +183,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 0,
         level: 0, // Link has no level
         linkMarkers: ['BOTTOM_LEFT', 'BOTTOM_RIGHT'],
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231042.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231042.png',
+        nameJa: 'DDD深淵王ビルガメス',
+        descriptionJa: '「DD」モンスター×２\nこのカード名の(1)(2)の効果はそれぞれ１ターンに１度しか使用できない。\n(1)：このカードが特殊召喚に成功した場合に発動できる。デッキからカード名が異なる「DD」Ｐモンスター２体を選んで自分のＰゾーンに置き、自分は１０００ダメージを受ける。この効果の発動後、ターン終了時まで自分は「DD」モンスターしか特殊召喚できない。\n(2)：リンク召喚したこのカードが相手モンスターの攻撃または相手の効果で破壊された場合に発動できる。自分のＥＸデッキ・墓地から「DD」モンスター１体を選んで守備表示で特殊召喚する。'
     },
     'c018': {
         cardId: 'c018',
@@ -169,7 +197,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 3000,
         rank: 10,
         scale: 10,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231803.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231803.png',
+        nameJa: 'DDD赦俿王デス・マキナ',
+        descriptionJa: '【Ｐスケール：青１０/赤１０】\nこのカード名のＰ効果は１ターンに１度しか使用できない。\n(1)：もう片方の自分のＰゾーンにカードが存在する場合、自分のフィールド・墓地のＰモンスター１体を対象として発動できる。もう片方の自分のＰゾーンのカードを特殊召喚し、対象のＰモンスターを自分のＰゾーンに置く。\n【モンスター効果】\n悪魔族レベル１０モンスター×２\nこのカードは自分フィールドの「DDD」モンスターの上に重ねてＸ召喚する事もできる。\n(1)：「DDD赦俿王デス・マキナ」は自分フィールドに１体しか表側表示で存在できない。\n(2)：相手フィールドのモンスターカードの効果が発動した時、このカードのＸ素材を２つ取り除くか、自分フィールドの「契約書」カード１枚を破壊して発動できる。その相手のカードをこのカードのＸ素材とする（１ターンに１度のみ）。\n(3)：自分スタンバイフェイズに発動できる。このカードを自分のＰゾーンに置く。'
     },
     'c019': {
         cardId: 'c019',
@@ -180,7 +210,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2800,
         defense: 2400,
         level: 8,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231842.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231842.png',
+        nameJa: 'DDD烈火大王エグゼクティブ・テムジン',
+        descriptionJa: 'レベル５以上の「DD」モンスター＋「DD」モンスター\nこのカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：このカードがモンスターゾーンに存在し、自分フィールドに元々の攻撃力以外の攻撃力を持つ「DD」モンスターが特殊召喚された場合、自分の墓地の「DD」モンスター１体を対象として発動できる。そのモンスターを特殊召喚する。\n(2)：自分ターンに魔法・罠カードの効果が発動した時に発動できる。その発動を無効にする。'
     },
     'c020': {
         cardId: 'c020',
@@ -191,7 +223,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2800,
         defense: 2200,
         level: 8,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231147.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231147.png',
+        nameJa: 'DDD呪血王サイフリート',
+        descriptionJa: 'チューナー＋チューナー以外の「DD」モンスター１体以上\nこのカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：フィールドの表側表示の魔法・罠カード１枚を対象として発動できる。そのカードの効果を次のスタンバイフェイズまで無効にする。この効果は相手ターンでも発動できる。\n(2)：このカードが戦闘・効果で破壊され墓地へ送られた場合に発動する。自分は自分フィールドの「契約書」カードの数×１０００ＬＰ回復する。'
     },
     'c021': {
         cardId: 'c021',
@@ -202,7 +236,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2300,
         defense: 2000,
         rank: 5,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231536.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231536.png',
+        nameJa: 'DDD狙撃王テル',
+        descriptionJa: 'レベル５モンスター×２\nこのカードは自分フィールドのランク４の「DDD」Ｘモンスターの上に重ねてＸ召喚する事もできる。\n(1)：１ターンに１度、自分が効果ダメージを受けた時、このカードのＸ素材を１つ取り除き、フィールドの表側表示モンスター１体を対象として発動できる。そのモンスターの攻撃力・守備力を１０００ダウンし、相手に１０００ダメージを与える。この効果は相手ターンでも発動できる。\n(2)：このカードがフィールドから墓地へ送られた場合に発動できる。デッキから「DD」カードまたは「契約書」カード１枚を墓地へ送る。'
     },
     'c022': {
         cardId: 'c022',
@@ -213,7 +249,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2400,
         defense: 1200,
         rank: 4,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231447.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231447.png',
+        nameJa: 'DDD怒濤王シーザー',
+        descriptionJa: '悪魔族レベル４モンスター×２\n(1)：このカードのＸ素材を１つ取り除いて発動できる。このターンに破壊されたモンスターをバトルフェイズ終了時に自分の墓地から可能な限り特殊召喚する。次のスタンバイフェイズに自分はこの効果で特殊召喚したモンスターの数×１０００ダメージを受ける。この効果は相手ターンでも発動できる。\n(2)：このカードがフィールドから墓地へ送られた場合に発動できる。デッキから「契約書」カード１枚を手札に加える。'
     },
     'c023': {
         cardId: 'c023',
@@ -224,7 +262,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2800,
         defense: 1800,
         rank: 6,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231220.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314231220.png',
+        nameJa: 'DDD怒濤大王エグゼクティブ・シーザー',
+        descriptionJa: '悪魔族レベル６モンスター×２\n(1)：モンスターを特殊召喚する効果を含む、モンスターの効果・魔法・罠カードが発動した時、このカードのＸ素材を１つ取り除いて発動できる。その発動を無効にし破壊する。その後、このカード以外の自分フィールドの「DD」モンスター１体を選び、その攻撃力をターン終了時まで１８００アップできる。\n(2)：このカードがフィールドから墓地へ送られた場合に発動できる。デッキから「契約書」カード１枚を手札に加える。'
     },
     'c024': {
         cardId: 'c024',
@@ -232,7 +272,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'TRAP',
         subType: 'CONTINUOUS',
         description: '[1] While you have 2 "DD" cards in P-Zones: Opponent cannot target monsters on field with Spells/Traps, tribute them for Tribute Summon, or use as material for Fusion/Synchro/Xyz. [2] Standby Phase: Take 1000 dmg.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250325/20250325170216.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250325/20250325170216.png',
+        nameJa: '闇魔界の契約書',
+        descriptionJa: 'このカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：以下の効果から１つを選択して発動できる。\n●自分の墓地の「DD」Ｐモンスター１体を対象として発動できる。そのモンスターを自分のＰゾーンに置く。\n●自分のＥＸデッキから表側表示の「DD」Ｐモンスター１体を自分のＰゾーンに置く。\n(2)：自分フィールドに「DD」Ｐモンスターが存在する限り、相手はフィールドのモンスターを魔法・罠カードの効果の対象にできず、融合・Ｓ・Ｘ召喚の素材にもできない。\n(3)：自分スタンバイフェイズに発動する。自分は１０００ダメージを受ける。'
     },
     'c025': {
         cardId: 'c025',
@@ -243,7 +285,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 1800,
         defense: 2500,
         rank: 4,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193141.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193141.png',
+        nameJa: 'DDD智慧王ソロモン',
+        descriptionJa: 'レベル４「DD」モンスター×２\n(1)：このカードが戦闘または相手の効果で破壊された場合に発動できる。自分のＥＸデッキ・墓地から「DDD智慧王ソロモン」以外の「DD」モンスター１体を選んで特殊召喚する。\n(2)：自分スタンバイフェイズに発動する。自分フィールドのカードの数×５００ダメージを受ける。'
     },
     'c026': {
         cardId: 'c026',
@@ -254,7 +298,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2100,
         defense: 1900,
         level: 6,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193829.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193829.png',
+        nameJa: 'DDD創始王クロヴィス',
+        descriptionJa: 'チューナー＋チューナー以外のモンスター１体以上\nこのカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：このカードがＳ召喚に成功した場合に発動できる。自分の墓地からレベル４以下の「DD」モンスター１体を選んで特殊召喚する。\n(2)：このカードが墓地へ送られた場合に発動できる。デッキから「契約書」カード１枚を手札に加える。'
     },
     'c027': {
         cardId: 'c027',
@@ -265,7 +311,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 1500,
         defense: 2000,
         level: 6,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193017.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193017.png',
+        nameJa: 'DDD聖賢王アルフレッド',
+        descriptionJa: '「DD」モンスター×２\n(1)：このカードが守備表示の場合、対象にならない。\n(2)：このカードが攻撃表示の場合、相手の効果の対象にならない。'
     },
     'c028': {
         cardId: 'c028',
@@ -276,7 +324,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 2200,
         level: 0, // Link has no level
         linkMarkers: ['BOTTOM_LEFT', 'BOTTOM', 'BOTTOM_RIGHT'],
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193118.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193118.png',
+        nameJa: 'DDD天空王ゼウス・ラグナロク',
+        descriptionJa: '「DD」モンスター２体以上\n(1)：このカードがモンスターゾーンに存在する限り、自分フィールドの「DD」モンスターは、相手の効果の対象にならず、相手の効果では破壊されない。\n(2)：１ターンに１度、自分・相手のバトルフェイズに発動できる。このカードを含む自分フィールドのモンスターを素材としてＳ召喚する。'
     },
     'c029': {
         cardId: 'c029',
@@ -288,7 +338,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 4000,
         level: 12,
         scale: 13,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193217.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193217.png',
+        nameJa: 'DDDD偉次元元王アーク・クライシス',
+        descriptionJa: '【Ｐスケール：青１３/赤１３】\n(1)：自分フィールドの「DD」Ｐモンスター１体を対象として発動できる。そのモンスターを破壊し、ＥＸデッキから「DD」Ｐモンスター２体を選んで自分のＰゾーンに置く（同名カードは１枚まで）。\n【モンスター効果】\nレベル１２「DD」モンスター×２\n(1)：このカードが特殊召喚に成功した場合に発動できる。相手フィールドの全ての表側表示カードの効果をターン終了時まで無効にする。\n(2)：このカードが守備表示モンスターを攻撃した場合、その守備力を攻撃力が超えた分だけ戦闘ダメージを与える。'
     },
     'c030': {
         cardId: 'c030',
@@ -300,7 +352,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 0,
         level: 8,
         scale: 0,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193037.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193037.png',
+        nameJa: 'DDD零死王ゼロ・マキナ',
+        descriptionJa: '【Ｐスケール：青０/赤０】\n(1)：１ターンに１度、もう片方の自分のＰゾーンにカードが存在しない場合に発動できる。デッキからＰモンスター１体を相手に見せ、その同名カード１枚を自分のＥＸデッキに表側表示で加える。\n【モンスター効果】\n(1)：このカードがモンスターゾーンに存在する限り、自分が受ける戦闘ダメージは０になる。\n(2)：このカードが戦闘または相手の効果で破壊された場合に発動できる。このカードを自分のＰゾーンに置く。'
     },
     'c031': {
         cardId: 'c031',
@@ -308,7 +362,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'TRAP',
         subType: 'NORMAL',
         description: '[1] While you control a "DDD" monster: Target 1 face-up monster opponent controls; take control of it until the End Phase of the next turn. Its effects are negated, it cannot attack. If it was SS from Extra Deck, it is also treated as a "DDD" monster.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230639.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250314/20250314230639.png',
+        nameJa: 'DDDヘッドハント',
+        descriptionJa: '(1)：自分フィールドに「DDD」モンスターが存在する場合、相手フィールドの表側表示モンスター１体を対象として発動できる。そのモンスターのコントロールを次のターンのエンドフェイズまで得る。この効果でコントロールを得たモンスターの効果は無効化され、攻撃宣言できない。この効果でコントロールを得たモンスターがＥＸデッキから特殊召喚されたモンスターの場合、そのモンスターは「DDD」モンスターとしても扱う。'
     },
     'c032': {
         cardId: 'c032',
@@ -319,7 +375,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 400,
         defense: 400,
         level: 2,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193528.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193528.png',
+        nameJa: 'DDランス・ソルジャー',
+        descriptionJa: 'このカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：自分フィールドの「DD」モンスター１体を対象として発動できる。そのモンスターのレベルをターン終了時まで、自分フィールドの「契約書」カードの数だけ上げる。\n(2)：このカードが墓地へ送られた場合に発動できる。デッキから「DD」モンスター１体を手札に加える。'
     },
     'c033': {
         cardId: 'c033',
@@ -330,7 +388,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         attack: 0,
         defense: 1800,
         level: 4,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193257.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193257.png',
+        nameJa: 'DDディフェンス・ソルジャー',
+        descriptionJa: 'このカード名の(1)の効果は１ターンに１度しか使用できない。\n(1)：このカードが召喚・特殊召喚に成功した場合に発動できる。手札から「DD」モンスター１体を特殊召喚する。この効果の発動後、ターン終了時まで自分は悪魔族モンスターしか特殊召喚できない。'
     },
     'c034': {
         cardId: 'c034',
@@ -338,7 +398,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         type: 'SPELL',
         subType: 'CONTINUOUS',
         description: '(This card is always treated as a "DD" card). [1] Once per turn: Target 1 other "DD" card you control; destroy it, and SS 1 "DD" monster from Deck. Lock into "DD" SS for rest of turn.',
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193404.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260203/20260203193404.png',
+        nameJa: '零王の契約書',
+        descriptionJa: 'このカードはルール上「DD」カードとしても扱う。\n(1)：１ターンに１度、自分メインフェイズに発動できる。手札から「DD」Ｐモンスター１体を特殊召喚する。\n(2)：自分スタンバイフェイズに発動する。自分は１０００ダメージを受ける。'
     },
     'c035': {
         cardId: 'c035',
@@ -350,7 +412,9 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         defense: 3000,
         level: 10,
         scale: 1,
-        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250324/20250324231246.png'
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20250324/20250324231246.png',
+        nameJa: 'DDD超死偉王ホワイテスト・ヘル・アーマゲドン',
+        descriptionJa: '【Ｐスケール：青１/赤１】\n(1)：１ターンに１度、相手モンスターの攻撃宣言時に、自分フィールドの「DDD」Ｓモンスター１体を対象として発動できる。そのモンスターの攻撃力以下の守備力を持つ相手フィールドのモンスターを全て破壊し、破壊したモンスターの数×１０００ダメージを相手に与える。\n【モンスター効果】\n「DD」チューナー＋チューナー以外の「DDD」モンスター１体以上\n(1)：このカードがモンスターゾーンに存在する限り、自分フィールドのモンスターを相手は効果の対象にできない。\n(2)：このカードがすでにモンスターゾーンに存在する状態で、このカード以外のモンスターが召喚・特殊召喚された場合に発動できる。相手は自身のフィールドのＰモンスター１体を選ぶ。そのモンスター以外の相手フィールドのモンスターの効果は無効化される。\n(3)：モンスターゾーンのこのカードが破壊された場合に発動できる。このカードを自分のＰゾーンに置く。'
     },
     // Add more fillers to reach ~30 if needed, or duplicates in deck
 
