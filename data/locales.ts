@@ -234,6 +234,8 @@ export const LOCALE_JA: { [key: string]: string } = {
     'ui_old': '↑旧',
     'ui_return_jump': '元の状態に戻る',
     'ui_duel_log': 'デュエルログ',
+    'ui_total_access': '合計アクセス数',
+    'ui_daily_access': '一日のアクセス数',
 
     // Specific Prompts / Logs
     'log_effect_already_used': '{card}の効果は既にこのターン使用されています。',
@@ -314,6 +316,8 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_necro_slime_banish': 'ネクロ・スライムの効果：{card1}と{card2}を除外。',
     'log_tell_mill': 'テルの効果：{card}を墓地へ送った。',
     'log_zeus_extra_p': '{card}を破壊し、このターンもう一度ペンデュラム召喚を可能にしました！',
+    'prompt_select_zone_fusion': '融合召喚するゾーンを選択してください',
+    'prompt_select_material': '素材として使用するカードを選択してください',
     'ui_search_deck': 'デッキを検索',
     'ui_select_zone': 'ゾーンを選択',
     'prompt_select_zone_for_card': '{card}のゾーンを選択してください',
@@ -356,6 +360,18 @@ export const LOCALE_JA: { [key: string]: string } = {
     'label_monster': 'モンスター',
     'label_spell': '魔法',
     'label_trap': '罠',
+
+    // Share Modal
+    'ui_share': '共有',
+    'ui_share_modal_title': '展開ルートの共有',
+    'ui_nickname': 'ニックネーム',
+    'ui_initial_setup': '初動',
+    'ui_explanation': '盤面の説明文',
+    'ui_send': '送信',
+    'log_share_success': '展開ルートを送信しました。',
+    'log_share_error': '送信に失敗しました。',
+    'ui_save': '保存',
+    'ui_archive': 'ルート倉庫',
 };
 
 export const formatLog = (key: string, params: { [key: string]: string } = {}): string => {

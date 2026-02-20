@@ -4,24 +4,24 @@ import { formatLog } from '@/data/locales';
 
 interface LogWindowProps {
     onClose?: () => void;
+    onOpenShare?: () => void;
 }
 
-export function LogWindow({ onClose }: LogWindowProps) {
+export function LogWindow({ onClose, onOpenShare }: LogWindowProps) {
     const { logs, jumpToLog, isReplaying, logOrder } = useGameStore();
 
     // 'newest' = descending (latest first), 'oldest' = ascending (oldest first)
     const isAscending = logOrder === 'oldest';
 
     const displayedLogs = isAscending
-        ? logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex }))
-        : logs.map((log, originalIndex) => ({ log, displayIndex: logs.length - originalIndex, originalIndex })).reverse();
+        ? logs.map((log, originalIndex) => ({ log, displayIndex: originalIndex + 1, originalIndex }))
+        : logs.map((log, originalIndex) => ({ log, displayIndex: originalIndex + 1, originalIndex })).reverse();
 
     return (
         <div style={{
             width: '300px',
             minWidth: '250px',
             height: '100%',
-            maxHeight: '80vh',
             backgroundColor: 'rgba(0,0,0,0.8)',
             border: '1px solid #444',
             borderRadius: '8px',
@@ -95,6 +95,46 @@ export function LogWindow({ onClose }: LogWindowProps) {
                     </div>
                 ))}
             </div>
+
+            {/* Action Buttons: Save & Archive */}
+            {!isReplaying && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <button
+                        onClick={onOpenShare}
+                        style={{
+                            flex: 1,
+                            padding: '8px',
+                            backgroundColor: '#9C27B0',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        {formatLog('ui_save')}
+                    </button>
+                    <a
+                        href="/archive"
+                        style={{
+                            flex: 1,
+                            padding: '8px',
+                            backgroundColor: '#2196F3',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            textDecoration: 'none',
+                            textAlign: 'center'
+                        }}
+                    >
+                        {formatLog('ui_archive')}
+                    </a>
+                </div>
+            )}
 
             {onClose && (
                 <button

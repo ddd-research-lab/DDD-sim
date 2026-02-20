@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   DndContext,
   DragOverlay,
@@ -23,7 +24,29 @@ import { CARD_DATABASE } from '@/data/cards';
 import { Card as CardType, ZoneType } from '@/types';
 import { DeckArea } from '@/components/DeckArea';
 import { EffectSelectionModal } from '@/components/EffectSelectionModal';
+import { ShareModal } from '@/components/ShareModal';
 import { formatLog } from '@/data/locales';
+
+function ReplayLoader() {
+  const searchParams = useSearchParams();
+  const replayId = searchParams.get('replayId');
+  const { loadArchive } = useGameStore();
+
+  useEffect(() => {
+    if (replayId) {
+      fetch(`/api/archive/${replayId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.history) {
+            loadArchive(data);
+          }
+        })
+        .catch(err => console.error('Failed to load replay', err));
+    }
+  }, [replayId, loadArchive]);
+
+  return null;
+}
 
 export default function Home() {
   const {
@@ -56,6 +79,8 @@ export default function Home() {
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [showLog, setShowLog] = useState(true); // Toggle between Log and Preview
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Toggle Sidebar Visibility
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [analytics, setAnalytics] = useState<{ total: number; daily: number } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -77,7 +102,7 @@ export default function Home() {
     allCardIds.forEach(id => {
       const def = CARD_DATABASE[id];
       const st = def.subType ? def.subType.toUpperCase() : '';
-      const isExtra = extraDeckTypes.some(t => st.includes(t));
+      const isExtra = extraDeckTypes.some(type => st.includes(type));
 
       // Machinex Exception: Known as Xyz/Pendulum (Extra Deck) logic handled in store, 
       // but for list building we just pass IDs. 
@@ -105,15 +130,7 @@ export default function Home() {
     };
     extraDeckList.sort((a, b) => getExtraDeckOrder(a) - getExtraDeckOrder(b));
 
-
     // Build Final Deck List passed to initializeGame
-    // initializeGame splits them, so we just provide a flat list.
-    // However, we want 1 of each Extra Deck card, and ~40 Main Deck cards.
-
-    // 1. Add Single Copy of each Extra Deck Card
-    const finalDeckList = [...extraDeckList];
-
-    // 2. Fill Main Deck
     // User Request: Fix Main Deck duplicates (Singleton display).
     // Sorting Order: P-Monsters (Level Asc), Non-P Monsters, Spells, Traps
     const sortedMain = [...mainDeckCandidates].sort((a, idB) => {
@@ -142,24 +159,36 @@ export default function Home() {
       }
 
       // Specific Swap for User Request: Necro Slime (c015) vs Defense Soldier (c033)
-      // User wants Defense Soldier first? Or Necro Slime first?
-      // Current ID sort: c015 < c033. (Necro < Defense).
-      // Request: "Swap them". So Defense < Necro.
       if (a === 'c015' && idB === 'c033') return 1;
       if (a === 'c033' && idB === 'c015') return -1;
 
       // Specific Swap for User Request: Swamp King (c006) vs Zero King (c034)
-      // Natural: c006 < c034. Swap -> Zero King (c034) First.
       if (a === 'c006' && idB === 'c034') return 1;
       if (a === 'c034' && idB === 'c006') return -1;
 
-      // Secondary sort by ID to ensure deterministic order
+      // Primary sort by numeric part of ID
+      const numA = parseInt(a.replace(/\D/g, '').padStart(3, '0'));
+      const numB = parseInt(idB.replace(/\D/g, '').padStart(3, '0'));
+      if (numA !== numB) return numA - numB;
+
       return a.localeCompare(idB);
     });
-    finalDeckList.push(...sortedMain);
 
-    initializeGame(CARD_DATABASE, finalDeckList);
+    initializeGame(CARD_DATABASE, [...sortedMain, ...extraDeckList]);
+  }, [initializeGame]);
+
+  useEffect(() => {
+    // Record and Fetch Access Stats
+    fetch('/api/analytics', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.total === 'number') {
+          setAnalytics(data);
+        }
+      })
+      .catch(err => console.error('Failed to update analytics', err));
   }, []);
+
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -258,6 +287,9 @@ export default function Home() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
+      <Suspense fallback={null}>
+        <ReplayLoader />
+      </Suspense>
       <main className="main-container" style={{
         background: useGradient
           ? `radial-gradient(circle at center, ${backgroundColor || '#201025'}, #000)`
@@ -287,10 +319,8 @@ export default function Home() {
 
         {/* Main Game Area */}
         <div className="game-area">
-          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-            <span>{formatLog('ui_title')}</span>
-
-            {/* Controls Container */}
+          <div style={{ color: '#666', fontSize: '12px', marginBottom: '10px', width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            {/* Controls Container (Moved Title out, changed to flex-end) */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
 
               {/* Replay / Stop Control */}
@@ -313,25 +343,27 @@ export default function Home() {
                   ■ {formatLog('ui_stop')}
                 </button>
               ) : (
-                <button
-                  onClick={() => useGameStore.getState().replay()}
-                  disabled={useGameStore.getState().logs.length === 0}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: '11px',
-                    backgroundColor: '#4caf50',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    cursor: useGameStore.getState().logs.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: useGameStore.getState().logs.length === 0 ? 0.5 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  ▶ {formatLog('ui_replay')}
-                </button>
+                <>
+                  <button
+                    onClick={() => useGameStore.getState().replay()}
+                    disabled={useGameStore.getState().logs.length === 0}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      backgroundColor: '#4caf50',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      cursor: useGameStore.getState().logs.length === 0 ? 'not-allowed' : 'pointer',
+                      opacity: useGameStore.getState().logs.length === 0 ? 0.5 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    ▶ {formatLog('ui_replay')}
+                  </button>
+                </>
               )}
 
               {/* Return Jump (Conditional) */}
@@ -464,14 +496,19 @@ export default function Home() {
           }}
         >
           {showLog ? (
-            <LogWindow onClose={() => setIsSidebarOpen(false)} />
+            <LogWindow
+              onClose={() => setIsSidebarOpen(false)}
+              onOpenShare={() => setIsShareModalOpen(true)}
+            />
           ) : (
             <GraveyardBanishedPreview onClose={() => setIsSidebarOpen(false)} />
           )}
         </div>
 
         <SearchModal />
+
         <EffectSelectionModal />
+        <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
 
         <DragOverlay>
           {activeCard ? <Card card={activeCard} isOverlay /> : null}
@@ -514,6 +551,26 @@ export default function Home() {
             }}>
               PENDULUM SUMMON
             </h1>
+          </div>
+        )}
+
+        {/* Footer Statistics */}
+        {analytics && (
+          <div style={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: '20px',
+            color: 'rgba(255,255,255,0.4)',
+            fontSize: '10px',
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+            zIndex: 10
+          }}>
+            <span>{formatLog('ui_total_access')}: {analytics.total}</span>
+            <span>{formatLog('ui_daily_access')}: {analytics.daily}</span>
           </div>
         )}
       </main>

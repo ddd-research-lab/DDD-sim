@@ -43,6 +43,8 @@ export interface GameState {
     normalSummonUsed: boolean;
     materials: { [hostId: string]: string[] }; // hostId -> list of attached cardIds
     backgroundColor: string; // User preference
+    useGradient: boolean; // Gradient background preference
+    fieldColor: string; // Field zone color preference
 
     // Logs
     logs: string[];

@@ -605,6 +605,10 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
         // [P-Effect] Add face-up "DD" P-Monster from Extra Deck to Hand.
         if (store.spellTrapZones.includes(selfId)) {
             if (fromLocation) return;
+            if (store.turnEffectUsage['c010_p']) {
+                store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+                return;
+            }
             store.startEffectSelection(formatLog('prompt_thomas_p_return'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice) => {
                 if (choice === 'yes') {
                     store.startSearch(
@@ -616,7 +620,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                         (id) => {
                             store.moveCard(id, 'HAND');
                             // moveCard handles the log
-                            store.addTurnEffectUsage('c010', selfId);
+                            store.addTurnEffectUsage('c010_p', selfId);
                         },
                         formatLog('prompt_select_card'),
                         store.extraDeck
@@ -628,6 +632,10 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
         // [Monster Effect] Target P-Zone card -> Destroy -> SS Lv8 DDD from Deck
         if (store.monsterZones.includes(selfId)) {
             if (fromLocation) return; // Manual Activation only
+            if (store.turnEffectUsage['c010_m']) {
+                store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+                return;
+            }
             store.startEffectSelection(formatLog('prompt_thomas_ss_lv8'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice) => {
                 if (choice === 'yes') {
                     store.startTargeting(
@@ -637,7 +645,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                             store.addLog(formatLog('log_destroy', { card: getCardName(store.cards[tid], store.language) }));
                             useGameStore.setState({ lastEffectSourceId: selfId });
                             store.moveCard(tid, 'GRAVEYARD');
-                            store.addTurnEffectUsage('c010', selfId);
+                            store.addTurnEffectUsage('c010_m', selfId);
 
                             store.startSearch(
                                 (c) => c.name.includes('DDD') && c.level === 8,
@@ -645,7 +653,13 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                     const emptyIndices = store.monsterZones.map((v, i) => v === null ? i : -1).filter(i => i !== -1);
                                     if (emptyIndices.length > 0) {
                                         store.startZoneSelection(formatLog('prompt_select_zone'), (t, i) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t, i) => {
-                                            store.moveCard(deckId, 'MONSTER_ZONE', i, undefined, false, true); // SS Defense? User didnt specify.
+                                            // Negate effects and set level 8
+                                            const s = useGameStore.getState();
+                                            const mods = { ...s.cardPropertyModifiers };
+                                            mods[deckId] = { isNegated: true, level: 8 };
+                                            useGameStore.setState({ cardPropertyModifiers: mods });
+
+                                            store.moveCard(deckId, 'MONSTER_ZONE', i, undefined, false, true); // SS
                                         });
                                     }
                                 },
@@ -882,7 +896,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                             const c = s.cards[id];
                             return c.subType?.includes('FUSION') && c.name.includes('DDD') && c.cardId !== 'c029';
                         }).map(id => ({
-                            label: s.cards[id].name,
+                            label: getCardName(s.cards[id], s.language),
                             value: id,
                             imageUrl: s.cards[id].imageUrl
                         }));
@@ -901,8 +915,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                 if (!s3.graveyard.includes(c.id)) return false;
                                 if (!c.name.includes('DD')) return false;
                                 if (c.id === selfId) return false;
-                                // Special rule for High King Genghis (c020)
-                                if (s3.cards[fusionId].cardId === 'c020') {
+                                // Special rule for High King Genghis (c019)
+                                if (s3.cards[fusionId].cardId === 'c019') {
                                     return (c.level || 0) >= 5;
                                 }
                                 return true;
@@ -1025,7 +1039,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
             const fusionOptions = store.extraDeck
                 .filter(id => store.cards[id].subType?.includes('FUSION') && store.cards[id].cardId !== 'c029')
                 .map(id => ({
-                    label: store.cards[id].name,
+                    label: getCardName(store.cards[id], store.language),
                     value: id,
                     imageUrl: store.cards[id].imageUrl
                 }));
@@ -1063,11 +1077,21 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                             },
                             (mat1) => {
                                 const remainingSource = sourceList.filter(id => id !== mat1);
+                                // High King Genghis (c019) requirement: At least one material must be Level 5+
+                                const isHighKingGenghis = fusionCard.cardId === 'c019';
+                                const mat1Level = store.cards[mat1].level || 0;
+
                                 store.startSearch(
                                     (c) => {
                                         const loc = checkLoc(c.id);
                                         if (!loc || !locs.includes(loc)) return false;
-                                        return matFilter(c);
+                                        if (!matFilter(c)) return false;
+
+                                        // Requirement check for c019
+                                        if (isHighKingGenghis && mat1Level < 5) {
+                                            return (c.level || 0) >= 5;
+                                        }
+                                        return true;
                                     },
                                     (mat2) => {
                                         const card1 = store.cards[mat1];
@@ -1354,12 +1378,12 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                     if (choice === 'yes') {
                         // Select Fusion Monster
                         store.startEffectSelection(
-                            'Select Fusion Monster to Summon:',
+                            formatLog('label_fusion_monster_select'),
                             store.extraDeck
                                 .map(id => store.cards[id])
                                 .filter(card => card.type === 'MONSTER' && card.subType?.includes('FUSION') && card.cardId !== 'c029')
                                 .map(card => ({
-                                    label: card.name,
+                                    label: getCardName(card, store.language),
                                     value: card.id,
                                     imageUrl: card.imageUrl
                                 })),
@@ -1372,19 +1396,28 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                 ].filter(id => id !== null) as string[];
 
                                 if (candidates.length < 2) {
-                                    store.addLog(store.language === 'ja' ? formatLog('log_error_material') : 'Not enough materials on Field/Banished.');
+                                    store.addLog(formatLog('log_error_material'));
                                     return;
                                 }
 
-                                // Suppress this intermediate prompt log
-                                // store.addLog('Select 2 Materials from Field/Banished.');
+                                const fusionCard = store.cards[fusionId];
+                                const isHighKingGenghis = fusionCard.cardId === 'c019';
 
                                 store.startSearch(
-                                    (card) => candidates.includes(card.id),
+                                    (card) => candidates.includes(card.id) && card.name.includes('DD'),
                                     (mat1Id) => {
+                                        const mat1Level = store.cards[mat1Id].level || 0;
                                         const remaining = candidates.filter(id => id !== mat1Id);
                                         store.startSearch(
-                                            (card) => remaining.includes(card.id),
+                                            (card) => {
+                                                if (!remaining.includes(card.id)) return false;
+                                                if (!card.name.includes('DD')) return false;
+                                                // High King Genghis requirement
+                                                if (isHighKingGenghis && mat1Level < 5) {
+                                                    return (card.level || 0) >= 5;
+                                                }
+                                                return true;
+                                            },
                                             (mat2Id) => {
                                                 // Execute Fusion
                                                 [mat1Id, mat2Id].forEach(id => {
@@ -1409,12 +1442,12 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                                 ];
 
                                                 if (validZones.length === 0) {
-                                                    freshState.addLog(freshState.language === 'ja' ? formatLog('log_error_condition') : 'No available zone for Fusion Summon.');
+                                                    freshState.addLog(formatLog('log_no_available_zones'));
                                                     return;
                                                 }
 
                                                 store.startZoneSelection(
-                                                    'Select Zone for Fusion Summon',
+                                                    formatLog('prompt_select_zone_fusion'),
                                                     (t, i) => {
                                                         const s = useGameStore.getState();
                                                         if (t === 'MONSTER_ZONE') {
@@ -1438,7 +1471,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                                     }
                                                 );
                                             },
-                                            '素材2を選択',
+                                            formatLog('prompt_select_material'),
                                             remaining
                                         );
                                     },
@@ -2178,7 +2211,7 @@ interface GameStore extends GameState {
     pendulumSummonLimit: number;
     incrementPendulumSummonLimit: () => void;
     // Card Property Modifiers
-    cardPropertyModifiers: { [cardId: string]: { level?: number, attack?: number, defense?: number } };
+    cardPropertyModifiers: { [cardId: string]: { level?: number, attack?: number, defense?: number, isNegated?: boolean } };
     modifyCardProperty: (cardId: string, property: 'level' | 'attack' | 'defense', value: number, operation: 'set' | 'add') => void;
 
     isPendulumSummoning: boolean;
@@ -2211,9 +2244,7 @@ interface GameStore extends GameState {
     returnFromJump: () => void; // Return to state before jump
     jumpHistory: Partial<GameState>[]; // Stack of states before jumps
     isReplaying: boolean;
-    replaySpeed: 'slow' | 'normal' | 'fast';
     activeEffectCardId: string | null;
-    toggleReplaySpeed: () => void;
     setActiveEffectCard: (cardId: string | null) => void;
     replay: () => void;
     stopReplay: () => void;
@@ -2223,8 +2254,10 @@ interface GameStore extends GameState {
     language: 'en' | 'ja';
     toggleLanguage: () => void;
     setLanguage: (lang: 'en' | 'ja') => void;
-    addExtraDeckCopy: (cardId: string) => void;
-    removeExtraDeckCopy: (cardId: string) => void;
+
+    // Setters for new features
+    setUseGradient: (use: boolean) => void;
+    loadArchive: (archive: any) => void;
 }
 
 
@@ -2241,6 +2274,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     extraMonsterZones: [null, null],
     lp: 8000,
     normalSummonUsed: false,
+    materials: {},
     backgroundColor: '#FFFFFF', // Default White
     fieldColor: 'rgb(80, 80, 80)', // Default R80 G80 B80
     useGradient: false, // Default No Gradient
@@ -2273,7 +2307,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     lastEffectSourceId: null,
     isReplaying: false,
     isHistoryBatching: false,
-    replaySpeed: 1, // Default Speed 1
+    replaySpeed: 5, // Default Speed 5
     cycleReplaySpeed: () => set((state) => ({ replaySpeed: state.replaySpeed >= 5 ? 1 : state.replaySpeed + 1 })),
     activeEffectCardId: null, // Initialize activeEffectCardId
     originalZoneOrder: null, // Initialize originalZoneOrder
@@ -3388,6 +3422,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     // Check Genghis (c007, c019) in Monster Zones & EMZ
                     [...s.monsterZones, ...s.extraMonsterZones].forEach(mid => {
                         if (!mid) return;
+                        if (s.cardPropertyModifiers[mid]?.isNegated) return; // Skip if negated
                         const card = s.cards[mid];
                         if (card.cardId === 'c007') {
                             // Flame King Genghis: Special Summon Only
@@ -3427,6 +3462,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     [0, 4].forEach(pid => {
                         const mid = s.spellTrapZones[pid];
                         if (mid && s.cards[mid].cardId === 'c008') {
+                            if (s.cardPropertyModifiers[mid]?.isNegated) return; // Skip if negated
                             const name = s.cards[mid].name;
                             if (cardId !== mid) { // Another DD
                                 if (!s.turnEffectUsage[`${name}_peffect_opt`] && s.graveyard.some(g => s.cards[g].name.includes('DD'))) {
@@ -4456,9 +4492,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Trigger Persistence Rule: Activation of other effects does not clear pending triggers.
             if (card && EFFECT_LOGIC[card.cardId]) {
                 const cid = card.cardId;
-                const hoptExempt = ['c021', 'c014', 'c030', 'c032', 'c012'];
+                const hoptExempt = ['c021', 'c014', 'c030', 'c032', 'c012', 'c010'];
 
                 const usage = get().turnEffectUsage[cid] || 0;
+                const isNegated = get().cardPropertyModifiers[cardId]?.isNegated;
+
+                if (isNegated) {
+                    get().addLog(formatLog('log_effect_negated', { card: getCardName(card, get().language) }));
+                    return;
+                }
 
                 if (hoptExempt.includes(cid) || usage < 1) {
                     useGameStore.setState({ isEffectActivated: false });
@@ -4570,6 +4612,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             const snapshot: Partial<GameState> = {
                 deck: state.deck,
+                cards: state.cards,
                 hand: state.hand,
                 graveyard: state.graveyard,
                 banished: state.banished,
@@ -4804,6 +4847,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             pendingChain: [],
             isBatching: false,
             currentStepIndex: -1, // Reset currentStepIndex on undo
+            useGradient: false,
+            fieldColor: '#000000',
         });
     },
 
@@ -4910,9 +4955,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setReplaySpeed: (speed) => set({ replaySpeed: speed }),
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
     stopReplay: () => set({ isReplaying: false }),
-    replay: async () => {
+    replay: async (skipSnapshot = false) => {
         // Ensure the latest action is captured in history before starting replay
-        if (!get().isHistoryBatching) {
+        if (!skipSnapshot && !get().isHistoryBatching) {
             get().pushHistory();
         }
 
@@ -4969,6 +5014,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     setBackgroundColor: (color: string) => set({ backgroundColor: color }),
+    setUseGradient: (use: boolean) => set({ useGradient: use }),
+    setFieldColor: (color: string) => set({ fieldColor: color }),
 
     // ... existing actions ...
 
@@ -5039,6 +5086,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 cards: newCards,
                 extraDeck: newExtraDeck
             };
+        });
+    },
+
+    loadArchive: (archive: any) => {
+        const { history } = archive;
+        if (!history || !Array.isArray(history) || history.length === 0) return;
+
+        // Reset to final state of the replay per user request
+        const initialState = history[history.length - 1];
+        set({
+            ...initialState,
+            history: history,
+            // Ensure derived state / UI is clean
+            isReplaying: false,
+            currentStepIndex: history.length - 1,
+            logs: initialState.logs || [],
+
+            // Clean UI
+            searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },
+            effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null },
+            targetingState: { isOpen: false, filter: null, onSelect: null, mode: 'normal' },
+            zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
+            modalQueue: [],
+            pendingChain: [],
+            isBatching: false,
+            activeEffectCardId: null,
+            lastEffectSourceId: null
         });
     }
 }));

@@ -21,9 +21,10 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  overflow: hidden;
+  overflow-y: auto;
+  /* Changed from hidden to auto to allow scrolling in Archive pages */
   /* App-like feel */
-  height: 100vh;
+  /* height: 100vh; Removed to allow content to grow */
   width: 100vw;
 }
 

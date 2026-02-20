@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local/runtime data
+data/*.json
+public/images/archives/
+repro_surveyor.ts
+delete_c018.js
+find_lines.js
+find_processUiQueue.js
+*repro*.ts
+*repro*.js
