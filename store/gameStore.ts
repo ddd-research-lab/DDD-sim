@@ -786,47 +786,78 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
 
         // [Trigger Effect] If sent to GY or Extra Deck: Return DD P-Monster Card from Field to Hand
         if ((store.graveyard.includes(selfId) || store.extraDeck.includes(selfId)) && fromLocation) {
-            // HOPT: Only block if previously activated (not cancelled)
             if (store.turnEffectUsage['c014_bounce']) {
                 return;
             }
 
-            const fieldCards = [
-                ...store.monsterZones,
-                ...store.extraMonsterZones,
-                ...store.spellTrapZones,
-                store.fieldZone
-            ].filter((id): id is string => id !== null);
+            // Start of candidate check logic (extracted for pre-check)
+            const getCandidates = (s: GameStore) => {
+                const currentFieldCards = [
+                    ...s.monsterZones,
+                    ...s.extraMonsterZones,
+                    ...s.spellTrapZones,
+                    s.fieldZone
+                ].filter((id): id is string => id !== null);
 
-            const candidates = fieldCards.filter(id =>
-                store.cards[id].name.includes('DD') && store.cards[id].subType?.includes('PENDULUM')
-            );
-
-            if (candidates.length > 0) {
-                store.startEffectSelection(formatLog('prompt_scale_surveyor_bounce'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice) => {
-                    if (choice === 'yes') {
-                        store.startSearch(
-                            (c) => candidates.includes(c.id),
-                            (selectedId) => {
-                                store.addTurnEffectUsage('c014_bounce'); // Consume HOPT ONLY when card is selected
-                                const cardDef = store.cards[selectedId];
-                                // Exception: Extra Deck monsters go back to EX
-                                const isExMonster = cardDef.subType?.includes('FUSION') || cardDef.subType?.includes('SYNCHRO') || cardDef.subType?.includes('XYZ') || cardDef.subType?.includes('LINK');
-
-                                if (isExMonster) {
-                                    store.moveCard(selectedId, 'EXTRA_DECK');
-                                    store.addLog(formatLog('log_to_extra', { card: cardDef.name }));
-                                } else {
-                                    // Suppress automatic log to prevent duplicates, then add manual localized log
-                                    store.moveCard(selectedId, 'HAND', 0, undefined, true);
-                                    store.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, store.language) }));
-                                }
-                            },
-                            'Select DD P-Monster Card from Field',
-                            candidates
-                        );
-                    }
+                return currentFieldCards.filter(id => {
+                    const c = s.cards[id];
+                    const isInDataLocation = s.graveyard.includes(id) || s.extraDeck.includes(id) || s.banished.includes(id);
+                    return !isInDataLocation && c.name.includes('DD') && c.subType?.includes('PENDULUM');
                 });
+            };
+
+            const candidatesBeforeQueue = getCandidates(store);
+            if (candidatesBeforeQueue.length === 0) return;
+
+            const executeBounce = () => {
+                const s = useGameStore.getState();
+                // HOPT Double-Check
+                if (s.turnEffectUsage['c014_bounce']) return;
+
+                const candidates = getCandidates(s);
+                // DEBUG LOG Removed
+                // s.addLog(`Debug Surveyor: Found ${candidates.length} candidates.`);
+                // candidates.forEach(cid => s.addLog(` - ${s.cards[cid].name} (${cid})`));
+
+                if (candidates.length > 0) {
+                    s.startEffectSelection(formatLog('prompt_scale_surveyor_bounce'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice) => {
+                        if (choice === 'yes') {
+                            const s2 = useGameStore.getState();
+                            s2.startSearch(
+                                (c) => candidates.includes(c.id),
+                                (selectedId) => {
+                                    const s3 = useGameStore.getState();
+                                    s3.addTurnEffectUsage('c014_bounce'); // Consume HOPT
+                                    const cardDef = s3.cards[selectedId];
+                                    const isExMonster = cardDef.subType?.includes('FUSION') || cardDef.subType?.includes('SYNCHRO') || cardDef.subType?.includes('XYZ') || cardDef.subType?.includes('LINK');
+
+                                    if (isExMonster) {
+                                        s3.moveCard(selectedId, 'EXTRA_DECK');
+                                        s3.addLog(formatLog('log_to_extra', { card: cardDef.name }));
+                                    } else {
+                                        s3.moveCard(selectedId, 'HAND', 0, undefined, true);
+                                        s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
+                                    }
+                                },
+                                formatLog('prompt_select_card'),
+                                candidates
+                            );
+                        }
+                    });
+                }
+            };
+
+            // Defer if inside a Link Summon sequence / Material Move
+            if (store.isLinkSummoningActive || store.isMaterialMove) {
+                useGameStore.setState(prev => ({
+                    pendingChain: [...prev.pendingChain, {
+                        id: `c014_deferred_${selfId}_${Date.now()}`,
+                        label: formatLog('prompt_scale_surveyor_bounce'),
+                        execute: executeBounce
+                    }]
+                }));
+            } else {
+                executeBounce();
             }
         }
     },
@@ -1538,7 +1569,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
     },
 
     // DDD Zero Doom Queen Machinex Logic
-    'c030': (store, selfId, fromLocation) => {
+    'c030': (store, selfId, fromLocation, summonVariant, isUsedAsMaterial) => {
         // [P-Effect]
         if (store.spellTrapZones.includes(selfId)) {
             // Check Lock Flag
@@ -1611,7 +1642,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
             }
 
             // Destruction Trigger -> Place in P-Zone (Existing)
-            if ((fromLocation === 'MONSTER_ZONE' || fromLocation === 'EXTRA_MONSTER_ZONE') && !store.isMaterialMove && !store.isLinkSummoningActive) {
+            // Fix: Check isUsedAsMaterial to prevent Link Material trigger logic
+            if ((fromLocation === 'MONSTER_ZONE' || fromLocation === 'EXTRA_MONSTER_ZONE') && !isUsedAsMaterial && !store.isMaterialMove && !store.isLinkSummoningActive) {
                 // Ensure we are truly in a terminal zone move, not a nested material move
                 if (store.isLinkSummoningActive) return;
                 const emptyP: number[] = [];
@@ -2191,6 +2223,8 @@ interface GameStore extends GameState {
     language: 'en' | 'ja';
     toggleLanguage: () => void;
     setLanguage: (lang: 'en' | 'ja') => void;
+    addExtraDeckCopy: (cardId: string) => void;
+    removeExtraDeckCopy: (cardId: string) => void;
 }
 
 
@@ -2912,13 +2946,55 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     }
                 }
 
+                // Helper: Is Extra Deck Monster Type?
+                const isExtraDeckType = (c: Card) => {
+                    const st = c.subType || '';
+                    return st.includes('FUSION') || st.includes('SYNCHRO') || st.includes('XYZ') || st.includes('LINK');
+                    // Note: Main Deck Pendulums are NOT Extra Deck Type here. They go to Hand/Deck normally.
+                };
+
                 // Add to destination
                 switch (toZone) {
                     case 'HAND':
-                        newState.hand = [...newState.hand, cardId];
+                        if (isExtraDeckType(card)) {
+                            // Redirect to Extra Deck (Face-Down)
+                            // "Return to Extra Deck" rule.
+                            newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], state.cards);
+                            actualDestination = 'EXTRA_DECK';
+
+                            // Ensure Face-Down
+                            if (card.faceUp) {
+                                const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                                newState.cards = newCards;
+                            }
+                        } else {
+                            // Normal
+                            // Reset faceUp if present (e.g. valid P-Monster returned from field to hand)
+                            if (card.faceUp) {
+                                const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                                newState.cards = newCards;
+                            }
+                            newState.hand = [...newState.hand, cardId];
+                        }
                         break;
                     case 'DECK':
-                        newState.deck = [cardId, ...newState.deck]; // Top of deck is index 0
+                        if (isExtraDeckType(card)) {
+                            // Redirect to Extra Deck (Face-Down)
+                            newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], state.cards);
+                            actualDestination = 'EXTRA_DECK';
+
+                            if (card.faceUp) {
+                                const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                                newState.cards = newCards;
+                            }
+                        } else {
+                            // Normal
+                            if (card.faceUp) {
+                                const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                                newState.cards = newCards;
+                            }
+                            newState.deck = [cardId, ...newState.deck]; // Top of deck is index 0
+                        }
                         break;
                     case 'GRAVEYARD':
                         // Rule: Block Banished -> GY drag-drop (Redundant check for certainty)
@@ -2933,18 +3009,66 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         const isMaterialFrom = fromLocation === 'MATERIAL';
 
                         if (isPendulum && wasOnField && !isMaterialFrom) {
-                            newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], state.cards);
+                            // Set Face-Up
+                            const newCards = { ...state.cards, [cardId]: { ...card, faceUp: true } };
+                            newState.cards = newCards;
+                            newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], newCards);
                             actualDestination = 'EXTRA_DECK'; // P-Rule redirect
                         } else {
+                            // Reset Face-Up (enter GY Face-Up technically, but property mainly relevant for EX)
+                            if (card.faceUp) {
+                                const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                                newState.cards = newCards;
+                            }
                             newState.graveyard = [...newState.graveyard, cardId];
                         }
 
                         break;
                     case 'BANISHED':
+                        // Reset Face-Up (Banished cards are face-up usually, but we don't track it yet unless facedown banish)
+                        if (card.faceUp) {
+                            const newCards = { ...state.cards, [cardId]: { ...card, faceUp: false } };
+                            newState.cards = newCards;
+                        }
                         newState.banished = [...newState.banished, cardId];
                         break;
                     case 'EXTRA_DECK':
-                        newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], state.cards);
+                        // Direct Move to Extra Deck.
+                        // If it's a Main Deck P-Monster, it's always Face-Up?
+                        // If it's a Hybrid (Fusion/Synchro/Xyz/Link):
+                        //   - If bounced to hand -> returns to Extra Deck (Face-Down).
+                        //   - If explicit effect says "add to Extra Deck face-up", use Face-Up.
+                        // Context: 'moveCard' is generic.
+                        // Assumption: If 'faceUp' property isn't explicitly passed in args (we don't have it yet),
+                        // we should default to Face-Down (false) for standard returns, 
+                        // BUT if it's already Face-Up (e.g. from Field P-Rule above), it's handled.
+                        // This block is for DIRECT target to EXTRA_DECK.
+                        // Scale Surveyor (c014) effect moves itself to EX Deck Face-Up?
+                        // Check c014 logic later.
+                        // For now, reset to Face-Down by default unless it's a Main Deck P-Monster?
+                        // Main Deck P-Monsters can only be in EX Deck Face-Up.
+                        const isMainDeckP = card.subType?.includes('PENDULUM') && !['FUSION', 'SYNCHRO', 'XYZ', 'LINK'].some(t => card.subType?.includes(t));
+                        const isPendulumAny = card.subType?.includes('PENDULUM');
+
+                        let newFaceUpState = false;
+                        if (isMainDeckP) {
+                            newFaceUpState = true;
+                        } else if (isPendulumAny && isFromField) {
+                            // Hybrid Pendulum moving from Field -> Extra Deck (Face-Up)
+                            // This covers rules where they are placed in EX Deck face-up.
+                            newFaceUpState = true;
+                        }
+
+                        // If we want to support "Add to Extra Deck Face-Up" for hybrids, we might need a flag.
+                        // But relying on existing 'faceUp' state might be flakey if it wasn't set.
+                        // Let's rely on card type for Main Deck Ps.
+                        // For Hybrids, they default to Face-Down unless context sets it?
+                        // If we move from Field to Extra Deck directly (not via GY redirect), is that possible?
+                        // "Return to Extra Deck" effects.
+
+                        const newCardsEX = { ...state.cards, [cardId]: { ...card, faceUp: newFaceUpState } };
+                        newState.cards = newCardsEX;
+                        newState.extraDeck = sortExtraDeck([...newState.extraDeck, cardId], newCardsEX);
                         break;
                     case 'MONSTER_ZONE':
                         if (typeof toIndex === 'number' && toIndex >= 0 && toIndex < 5) {
@@ -3327,6 +3451,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 const hoptExempt = ['c021', 'c012', 'c009']; // Tell, Count Surveyor, and Copernicus manage own HOPT
                 const usage = s.turnEffectUsage[cid] || 0;
 
+                // Recalculate isUsedAsMaterial for scope access
+                const isUsedAsMaterialForLogic = (toZone === 'GRAVEYARD' || toZone === 'EXTRA_DECK') && (s.isLinkSummoningActive || s.isMaterialMove);
+
                 if (hoptExempt.includes(cid) || usage < 1) {
                     const finalLoc = determinedFromLocation;
                     useGameStore.setState({ isEffectActivated: false }); // Reset before call
@@ -3335,12 +3462,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         useGameStore.setState(prev => ({
                             pendingEffects: [...prev.pendingEffects, () => {
                                 useGameStore.getState().setActiveEffectCard(cardId);
-                                EFFECT_LOGIC[cid](get(), cardId, finalLoc, summonVariant);
+                                (EFFECT_LOGIC as any)[cid](get(), cardId, finalLoc, summonVariant, isUsedAsMaterialForLogic);
                             }]
                         }));
                     } else {
                         get().setActiveEffectCard(cardId);
-                        EFFECT_LOGIC[cid](get(), cardId, finalLoc, summonVariant);
+                        (EFFECT_LOGIC as any)[cid](get(), cardId, finalLoc, summonVariant, isUsedAsMaterialForLogic);
                     }
 
                     // Legacy check: We used to auto-increment usage here.
@@ -3915,12 +4042,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                     return s.monsterZones[i] === null || targetId === s.monsterZones[i];
                                 }
                                 if (t === 'EXTRA_MONSTER_ZONE') {
-                                    // DEUS MACHINEX Exception: If ANY EMZ is occupied (even by the targetId itself), block EMZ selection.
-                                    // This forces it to be summoned to MMZ or remain in its current EMZ.
-                                    const emzOccupied = s.extraMonsterZones[0] !== null || s.extraMonsterZones[1] !== null;
-                                    if (emzOccupied) return false;
+                                    // DEUS MACHINEX Exception: Allow if replacing the target (Overlay)
+                                    // If the zone has the target material, it's valid validation.
+                                    if (s.extraMonsterZones[i] === targetId) return true;
 
-                                    return s.extraMonsterZones[i] === null;
+                                    // Otherwise, apply standard EMZ rules? 
+                                    // If we are summoning to a DIFFERENT zone, we need to check occupancy.
+                                    // Standard Rule: Can only use EMZ if empty (or valid linked).
+                                    // And we must respect "1 EMZ per player" rule loosely.
+
+                                    // If occupied by someone else, return false
+                                    if (s.extraMonsterZones[i] !== null) return false;
+
+                                    // If empty, allow? 
+                                    // Only if we are not "stealing" the slot while holding another?
+                                    // Simplified: If target is in MMZ, we can maybe move to EMZ?
+                                    // But typically Overlay stays in same zone. 
+                                    // Let's just allow Empty EMZ + Target EMZ.
+                                    return true;
                                 }
                                 return false;
                             },
@@ -4307,6 +4446,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ activeEffectCardId: cardId });
         get().pushHistory();
         set({ activeEffectCardId: null });
+        get().pushHistory(); // Force clear highlight snapshot for Replay
 
         const { cards, hand, normalSummonUsed, monsterZones, extraMonsterZones } = get();
         const card = cards[cardId];
@@ -4771,6 +4911,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
     stopReplay: () => set({ isReplaying: false }),
     replay: async () => {
+        // Ensure the latest action is captured in history before starting replay
+        if (!get().isHistoryBatching) {
+            get().pushHistory();
+        }
+
         const { history, replaySpeed } = get();
         if (get().isReplaying || history.length === 0) return;
 
@@ -4784,16 +4929,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             const snapshot = history[i];
 
-            // Detect Pendulum Summon
-            if (snapshot.pendulumSummonCount > prevPendulumSummonCount) {
+            // Detect Pendulum Summon (Count increased in this snapshot compared to prev)
+            // Show Cut-In BEFORE updating board to new state (so we see the previous board + cut-in -> then new board with monsters)
+            const p1 = snapshot.spellTrapZones[0];
+            const p4 = snapshot.spellTrapZones[4];
+            if (snapshot.pendulumSummonCount > prevPendulumSummonCount && p1 && p4) {
                 // Trigger Cut-in
                 set({ showPendulumCutIn: true });
-                // Wait for cut-in animation (e.g. 2 seconds)
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Wait for cut-in animation (Speed 1.5x: 2000ms -> ~1333ms)
+                await new Promise(resolve => setTimeout(resolve, 1333));
                 set({ showPendulumCutIn: false });
             }
             prevPendulumSummonCount = snapshot.pendulumSummonCount;
-
 
             set({
                 ...snapshot,
@@ -4834,6 +4981,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             // Clear highlight after snapshot so it doesn't persist to next steps (resolution/summon)
             useGameStore.setState({ activeEffectCardId: null });
+            get().pushHistory(); // Force clear highlight snapshot for Replay
 
             // Only remove the current card from candidates
             useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== cardId) }));
@@ -4852,6 +5000,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
             }
         }
+    },
+
+    addExtraDeckCopy: (cardId: string) => {
+        set((state) => {
+            // Check if this card is allowed to be added (must be in initial Extra Deck)
+            if (!state.initialExtraDeckCardIds.includes(cardId)) {
+                return state;
+            }
+
+            // Find template card (any existing instance)
+            const templateCard = Object.values(state.cards).find(c => c.cardId === cardId);
+
+            if (!templateCard) return state;
+
+            const newId = `${cardId}_copy_${Math.random().toString(36).substr(2, 5)}`;
+            const newCard = { ...templateCard, id: newId, faceUp: false }; // Ensure Face-Down
+
+            return {
+                cards: { ...state.cards, [newId]: newCard },
+                extraDeck: sortExtraDeck([...state.extraDeck, newId], { ...state.cards, [newId]: newCard })
+            };
+        });
+    },
+
+    removeExtraDeckCopy: (cardId: string) => {
+        set((state) => {
+            // Find last instance to remove (LIFOish)
+            const instances = state.extraDeck.filter(id => state.cards[id].cardId === cardId);
+            if (instances.length <= 1) return state; // Keep at least 1
+
+            const toRemove = instances[instances.length - 1];
+            const newExtraDeck = state.extraDeck.filter(id => id !== toRemove);
+            const newCards = { ...state.cards };
+            delete newCards[toRemove];
+
+            return {
+                cards: newCards,
+                extraDeck: newExtraDeck
+            };
+        });
     }
 }));
 

@@ -2,7 +2,11 @@ import React from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { formatLog } from '@/data/locales';
 
-export function LogWindow() {
+interface LogWindowProps {
+    onClose?: () => void;
+}
+
+export function LogWindow({ onClose }: LogWindowProps) {
     const { logs, jumpToLog, isReplaying, logOrder } = useGameStore();
 
     // 'newest' = descending (latest first), 'oldest' = ascending (oldest first)
@@ -53,6 +57,25 @@ export function LogWindow() {
                     {logOrder === 'newest' ? '▼' : '▲'}
                 </button>
                 <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
+                {useGameStore.getState().jumpHistory?.length > 0 && (
+                    <button
+                        onClick={() => useGameStore.getState().returnFromJump()}
+                        style={{
+                            marginLeft: 'auto',
+                            padding: '1px 6px',
+                            fontSize: '9px',
+                            backgroundColor: '#d32f2f',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                        }}
+                        title="Return to latest state"
+                    >
+                        ↩ Return
+                    </button>
+                )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
@@ -72,6 +95,26 @@ export function LogWindow() {
                     </div>
                 ))}
             </div>
+
+            {onClose && (
+                <button
+                    onClick={onClose}
+                    style={{
+                        backgroundColor: '#444',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        padding: '8px',
+                        marginTop: '8px',
+                        width: '100%',
+                        textAlign: 'center',
+                        fontSize: '12px'
+                    }}
+                >
+                    {formatLog('ui_close')}
+                </button>
+            )}
         </div>
     );
 }

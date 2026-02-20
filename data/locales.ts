@@ -218,6 +218,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_gryphon_eff': 'グリフォンの効果で1枚ドローしました。',
     // UI Labels
     'ui_extra_deck': 'エクストラデッキ',
+    'ui_face_up': '表側',
     'ui_copies': '枚',
     'ui_pendulum_summon_selection': 'ペンデュラム召喚の選択',
     'ui_pendulum_summon_instruction': '同時に特殊召喚するモンスターを選択してください。',

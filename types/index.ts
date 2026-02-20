@@ -18,11 +18,13 @@ export interface Card {
     flags?: string[]; // Dynamic flags like 'BANISH_ON_LEAVE'
     nameJa?: string;
     descriptionJa?: string;
+    faceUp?: boolean; // Track Face-Up state (mainly for Extra Deck)
 }
 
 export type ZoneType = 'DECK' | 'HAND' | 'GRAVEYARD' | 'BANISHED' | 'EXTRA_DECK' | 'MONSTER_ZONE' | 'SPELL_TRAP_ZONE' | 'FIELD_ZONE' | 'MATERIAL' | 'EXTRA_MONSTER_ZONE';
 
 export interface GameState {
+    cards: { [id: string]: Card }; // Map of instance ID to Card data
     deck: string[]; // List of Card Instance IDs
     hand: string[];
     graveyard: string[];

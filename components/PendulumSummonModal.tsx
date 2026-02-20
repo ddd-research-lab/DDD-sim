@@ -4,7 +4,7 @@ import { Card } from './Card';
 import { formatLog } from '@/data/locales';
 
 export function PendulumSummonModal() {
-    const { isPendulumSummoning, isPendulumProcessing, pendulumCandidates, resolvePendulumSelection, cancelPendulumSummon, cards } = useGameStore();
+    const { isPendulumSummoning, isPendulumProcessing, pendulumCandidates, resolvePendulumSelection, cancelPendulumSummon, cards, spellTrapZones } = useGameStore();
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     useEffect(() => {
@@ -13,7 +13,12 @@ export function PendulumSummonModal() {
         }
     }, [isPendulumSummoning]);
 
-    if (!isPendulumSummoning || isPendulumProcessing) return null;
+    // Validation: Ensure we actually have scales to perform P-Summon.
+    const p1 = spellTrapZones[0];
+    const p2 = spellTrapZones[4];
+    const hasScales = p1 && p2;
+
+    if (!isPendulumSummoning || isPendulumProcessing || !hasScales) return null;
 
     const toggleSelection = (id: string) => {
         if (selectedIds.includes(id)) {

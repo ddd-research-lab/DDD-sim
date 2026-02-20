@@ -163,7 +163,7 @@ export function Board() {
             >
                 <Zone id="banished-zone" type="BANISHED" label={formatLog('ui_banished')}>
                     {banished.length > 0 && renderCard(banished[banished.length - 1], false)}
-                    {banished.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'blue', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>{banished.length}</div>}
+                    {banished.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'blue', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white', zIndex: 10 }}>{banished.length}</div>}
                 </Zone>
             </div>
 
@@ -186,7 +186,7 @@ export function Board() {
             >
                 <Zone id="graveyard-zone" type="GRAVEYARD" label={formatLog('ui_graveyard')}>
                     {graveyard.length > 0 && renderCard(graveyard[graveyard.length - 1], false)}
-                    {graveyard.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'red', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>{graveyard.length}</div>}
+                    {graveyard.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'red', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white', zIndex: 10 }}>{graveyard.length}</div>}
                 </Zone>
             </div>
 
@@ -206,7 +206,7 @@ export function Board() {
                 gridColumn: '1 / 2',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: (isReplaying && activeEffectCardId && extraDeck.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(255, 255, 0, 0.8)' : 'none',
+                boxShadow: 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}

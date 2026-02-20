@@ -15,6 +15,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { Board } from '@/components/Board';
 import { Hand } from '@/components/Hand';
 import { LogWindow } from '@/components/LogWindow';
+import { GraveyardBanishedPreview } from '@/components/GraveyardBanishedPreview';
 import { Card } from '@/components/Card';
 import { SearchModal } from '@/components/SearchModal';
 import { useGameStore } from '@/store/gameStore';
@@ -22,7 +23,7 @@ import { CARD_DATABASE } from '@/data/cards';
 import { Card as CardType, ZoneType } from '@/types';
 import { DeckArea } from '@/components/DeckArea';
 import { EffectSelectionModal } from '@/components/EffectSelectionModal';
-import { formatLog, getCardName } from '@/data/locales';
+import { formatLog } from '@/data/locales';
 
 export default function Home() {
   const {
@@ -53,7 +54,8 @@ export default function Home() {
     returnFromJump
   } = useGameStore();
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
-  const [showLog, setShowLog] = useState(true); // Default Open on PC
+  const [showLog, setShowLog] = useState(true); // Toggle between Log and Preview
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Toggle Sidebar Visibility
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -62,17 +64,6 @@ export default function Home() {
       },
     })
   );
-
-  useEffect(() => {
-    // ... (existing initialization logic can stay, or is this replace too wide?)
-    // Let's target specific blocks to be safe.
-    // Actually, I need to update the `return` block.
-    // So let's split this.
-    // I'll update the Destructuring first.
-  }, []);
-
-  // ...
-
 
   useEffect(() => {
     // Initialize Game
@@ -275,10 +266,23 @@ export default function Home() {
         {/* Log Toggle Button */}
         <button
           className="log-toggle-btn"
-          onClick={() => setShowLog(!showLog)}
-          style={{ zIndex: 101 }} // Ensure above log area
+          onClick={() => {
+            if (!isSidebarOpen) {
+              setIsSidebarOpen(true);
+              // Keep current showLog state (or default to Log?)
+            } else {
+              // Toggle between Log and Preview
+              setShowLog(!showLog);
+            }
+          }}
+          style={{ zIndex: 101, width: '100px' }} // Ensure above log area
         >
-          {showLog ? 'Close Log' : 'Log'}
+          {/* Label Logic: 
+              If Closed: "Open Sidebar" (or "Log/Preview")
+              If Open & Log: "Show Preview"
+              If Open & Preview: "Show Log"
+          */}
+          {!isSidebarOpen ? 'Log/Preview' : (showLog ? 'Preview' : 'Log')}
         </button>
 
         {/* Main Game Area */}
@@ -449,18 +453,21 @@ export default function Home() {
         </div>
 
         {/* Sidebar Log Area */}
-        {/* PC: Conditional Display. Mobile: Independent 'open' class */}
         <div
-          className={`log-area ${showLog ? 'open' : ''}`}
+          className={`log-area ${isSidebarOpen ? 'open' : ''}`}
           style={{
             // PC override: if !showLog, hide it. 
             // Mobile uses specific CSS classes/media queries, but 'display: none' works generally if we want to hide it.
             // However, mobile slides it out.
             // Let's use display: none for PC when closed to reclaim space.
-            display: showLog ? 'flex' : 'none'
+            display: isSidebarOpen ? 'flex' : 'none'
           }}
         >
-          <LogWindow />
+          {showLog ? (
+            <LogWindow onClose={() => setIsSidebarOpen(false)} />
+          ) : (
+            <GraveyardBanishedPreview onClose={() => setIsSidebarOpen(false)} />
+          )}
         </div>
 
         <SearchModal />

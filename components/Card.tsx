@@ -153,13 +153,13 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                 ...style,
                 transform: CSS.Translate.toString(transform),
             }}
-            // Only animate scale/shadow if replaying and active. Do NOT animate transform or layout here.
-            animate={isReplaying && activeEffectCardId === card.id ? {
-                boxShadow: ["0px 0px 0px 0px rgba(0, 255, 0, 0)", "0px 0px 20px 10px rgba(0, 255, 0, 0.8)", "0px 0px 0px 0px rgba(0, 255, 0, 0)"],
-                scale: [1, 1.1, 1],
-                borderColor: ["#444", "#00ff00", "#444"],
-            } : undefined}
-            transition={{ duration: 0.5, times: [0, 0.5, 1] }}
+        // Only animate scale/shadow if replaying and active. Do NOT animate transform or layout here.
+        // animate={isReplaying && activeEffectCardId === card.id ? {
+        //     boxShadow: ["0px 0px 0px 0px rgba(0, 255, 0, 0)", "0px 0px 20px 10px rgba(0, 255, 0, 0.8)", "0px 0px 0px 0px rgba(0, 255, 0, 0)"],
+        //     scale: [1, 1.1, 1],
+        //     borderColor: ["#444", "#00ff00", "#444"],
+        // } : undefined}
+        // transition={{ duration: 0.5, times: [0, 0.5, 1] }}
         >
             {/* Render Materials Underneath */}
             {!isOverlay && attachedMaterials.length > 0 && attachedMaterials.map((matId, idx) => (

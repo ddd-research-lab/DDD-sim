@@ -41,12 +41,16 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         // For brevity, keeping generic checks, upgrading Link check.
 
         // 1. Fusion (Disabled highlight per user request, except for Arc Crisis)
-        if (card.subType?.includes('FUSION') && card.cardId !== 'c029') {
-            return false;
+        if (card.subType?.includes('FUSION')) {
+            if (card.faceUp) return false; // Hybrid P-Monster Face-Up in EX: Only P-Summonable
+            if (card.cardId !== 'c029') {
+                return false;
+            }
         }
 
         // 2. Synchro
         if (card.subType?.includes('SYNCHRO')) {
+            if (card.faceUp) return false; // Hybrid P-Monster Face-Up in EX: Only P-Summonable
             const monsterIds = [...monsterZones, ...useGameStore.getState().extraMonsterZones].filter((id): id is string => id !== null);
             const monsters = monsterIds.map(id => cards[id]);
             const tuners = monsters.filter(m => m.subType?.includes('TUNER'));
@@ -57,6 +61,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
         // 3. Xyz
         if (card.subType?.includes('XYZ')) {
+            if (card.faceUp) return false; // Hybrid P-Monster Face-Up in EX: Only P-Summonable
             const rank = card.rank || 0;
             const monsterIds = [...monsterZones, ...useGameStore.getState().extraMonsterZones].filter((id): id is string => id !== null);
             const monsters = monsterIds.map(id => cards[id]);
@@ -176,7 +181,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
             // 1. Confirm & Close Modal
             onClose();
-            addLog(formatLog('log_link_init', { card: getCardName(card, language) }));
+            // addLog(formatLog('log_link_init', { card: getCardName(card, language) })); // Suppressed per user request
 
             // 2. Select Materials First
             useGameStore.getState().clearSelectedCards(); // Reset
@@ -338,31 +343,40 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
     const finishLinkSummon = (linkCardId: string, matIds: string[], zoneType: any, zoneIndex: number) => {
         const { moveCard, addLog, cards } = useGameStore.getState();
 
-        // Set material move flag to suppress triggers like Zero Machinex
-        useGameStore.setState({ isMaterialMove: true });
+        // Start Batching & Set Link Summon Flag
+        useGameStore.setState({ isBatching: true, isLinkSummoningActive: true });
 
-        // 1. Send Materials (Sync)
-        matIds.forEach(id => {
-            const c = cards[id];
-            // P-Rule: Field P-Monster -> Extra Deck Face-Up
-            if (c.subType?.includes('PENDULUM')) {
-                moveCard(id, 'EXTRA_DECK');
-                addLog(formatLog('log_material_to_extra', { card: getCardName(c, useGameStore.getState().language) }));
-            } else {
-                moveCard(id, 'GRAVEYARD');
-                addLog(formatLog('log_material_to_gy', { card: getCardName(c, useGameStore.getState().language) }));
-            }
-        });
+        try {
+            // Set material move flag to suppress triggers like Zero Machinex
+            useGameStore.setState({ isMaterialMove: true });
 
-        // Reset material move flag
-        useGameStore.setState({ isMaterialMove: false });
+            // 1. Send Materials (Sync)
+            matIds.forEach(id => {
+                const c = cards[id];
+                // P-Rule: Field P-Monster -> Extra Deck Face-Up
+                if (c.subType?.includes('PENDULUM')) {
+                    moveCard(id, 'EXTRA_DECK');
+                    addLog(formatLog('log_material_to_extra', { card: getCardName(c, useGameStore.getState().language) }));
+                } else {
+                    moveCard(id, 'GRAVEYARD');
+                    addLog(formatLog('log_material_to_gy', { card: getCardName(c, useGameStore.getState().language) }));
+                }
+            });
 
-        // 2. Summon Link Monster
-        moveCard(linkCardId, zoneType, zoneIndex, undefined, false, true);
-        const freshCards = useGameStore.getState().cards;
+            // Reset material move flag
+            useGameStore.setState({ isMaterialMove: false });
 
+            // 2. Summon Link Monster
+            moveCard(linkCardId, zoneType, zoneIndex, undefined, false, true);
 
-        useGameStore.getState().clearSelectedCards(); // Cleanup
+            useGameStore.getState().clearSelectedCards(); // Cleanup
+
+        } finally {
+            // End Batching & Process Queue
+            useGameStore.setState({ isBatching: false, isLinkSummoningActive: false });
+            useGameStore.getState().processPendingEffects(); // Execute deferred effects (Gilgamesh etc)
+            useGameStore.getState().processUiQueue();
+        }
     };
 
     // Arc Crisis Summon Logic
@@ -809,8 +823,23 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                                 }}
                             >
                                 <Card card={cards[instanceId]} />
-
-
+                                {card.faceUp && ['c018', 'c029', 'c035'].includes(cardId) && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '5px',
+                                        right: '5px',
+                                        background: 'rgba(255, 255, 0, 0.9)',
+                                        color: '#000',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                                        zIndex: 10
+                                    }}>
+                                        {language === 'ja' ? formatLog('ui_face_up') : 'Face-Up'}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
