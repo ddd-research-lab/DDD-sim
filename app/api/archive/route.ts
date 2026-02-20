@@ -6,6 +6,10 @@ const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'archives.json');
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'archives');
 
 // Ensure directories exist
+const DATA_DIR = path.join(process.cwd(), 'data');
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 if (!fs.existsSync(IMAGES_DIR)) {
     fs.mkdirSync(IMAGES_DIR, { recursive: true });
 }
@@ -80,8 +84,11 @@ export async function POST(request: Request) {
         fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(archives, null, 2));
 
         return NextResponse.json({ success: true, id });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error saving archive:', error);
-        return NextResponse.json({ error: 'Failed to save archive' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Failed to save archive',
+            details: error.message
+        }, { status: 500 });
     }
 }

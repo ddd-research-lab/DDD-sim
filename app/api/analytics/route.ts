@@ -6,6 +6,10 @@ const ANALYTICS_FILE_PATH = path.join(process.cwd(), 'data', 'analytics.json');
 
 // Initialize data if not exists
 function ensureFile() {
+    const dataDir = path.dirname(ANALYTICS_FILE_PATH);
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
     if (!fs.existsSync(ANALYTICS_FILE_PATH)) {
         const initialData = {
             total: 0,
