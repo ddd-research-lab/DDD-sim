@@ -1,37 +1,32 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase';
 
-const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'archives.json');
-const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'archives');
-
-// Ensure directories exist
-const DATA_DIR = path.join(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(IMAGES_DIR)) {
-    fs.mkdirSync(IMAGES_DIR, { recursive: true });
-}
+// Increase body size limit for large screenshots (Base64)
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb',
+        },
+    },
+};
 
 export async function GET() {
     try {
-        if (!fs.existsSync(DATA_FILE_PATH)) {
-            return NextResponse.json([]);
-        }
-        const data = fs.readFileSync(DATA_FILE_PATH, 'utf8');
-        const archives = JSON.parse(data);
-        // Sort by date desc
-        archives.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const { data: archives, error } = await supabase
+            .from('archives')
+            .select('id, nickname, initial_setup, explanation, created_at, image_path, likes')
+            .order('created_at', { ascending: false });
 
-        // Return summary list (exclude heavy history/logs to save bandwidth list view)
+        if (error) throw error;
+
+        // Map column names to camelCase if necessary (matching previous JSON structure)
         const summary = archives.map((a: any) => ({
             id: a.id,
             nickname: a.nickname,
-            initialSetup: a.initialSetup,
+            initialSetup: a.initial_setup,
             explanation: a.explanation,
-            createdAt: a.createdAt,
-            imagePath: a.imagePath,
+            createdAt: a.created_at,
+            imagePath: a.image_path,
             likes: a.likes || 0
         }));
 
@@ -50,38 +45,28 @@ export async function POST(request: Request) {
         const id = Date.now().toString();
         const createdAt = new Date().toISOString();
         let imagePath = '';
-
+        // For now, we store the image as a base64 string in the DB text column.
+        // In a future update, this should be moved to Supabase Storage.
         if (image) {
-            // Save image
-            const buffer = Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), 'base64');
-            const fileName = `${id}.png`;
-            const filePath = path.join(IMAGES_DIR, fileName);
-            fs.writeFileSync(filePath, buffer);
-            imagePath = `/images/archives/${fileName}`;
+            imagePath = image;
         }
 
         const newArchive = {
             id,
-            nickname,
-            initialSetup,
-            explanation,
-            history,
-            logs,
-            imagePath,
-            createdAt,
-            authorId: authorId || '', // Store the user ID of the creator
+            nickname: nickname || 'Anonymous',
+            initial_setup: initialSetup || '',
+            explanation: explanation || '',
+            history: history || [],
+            logs: logs || [],
+            image_path: imagePath,
+            created_at: createdAt,
+            author_id: authorId || '',
             likes: 0,
-            likedBy: []
+            liked_by: []
         };
 
-        let archives = [];
-        if (fs.existsSync(DATA_FILE_PATH)) {
-            const fileData = fs.readFileSync(DATA_FILE_PATH, 'utf8');
-            archives = JSON.parse(fileData);
-        }
-
-        archives.push(newArchive);
-        fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(archives, null, 2));
+        const { error } = await supabase.from('archives').insert([newArchive]);
+        if (error) throw error;
 
         return NextResponse.json({ success: true, id });
     } catch (error: any) {

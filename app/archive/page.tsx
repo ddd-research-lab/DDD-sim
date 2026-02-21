@@ -35,7 +35,7 @@ export default function ArchiveListPage() {
 
     return (
         <div style={{ padding: '20px', color: '#fff' }}>
-            <h1>Archive List</h1>
+            <h1>ルート倉庫</h1>
             <Link href="/" style={{ color: '#aaa', textDecoration: 'underline' }}>Back to Simulator</Link>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>

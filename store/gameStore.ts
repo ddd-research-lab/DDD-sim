@@ -125,7 +125,7 @@ const sortExtraDeck = (instanceIds: string[], cards: { [id: string]: Card }): st
 };
 
 // Effect helper logic
-const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromLocation?: string, summonVariant?: string) => void } = {
+const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocation?: string, summonVariant?: string, isUsedAsMaterial?: boolean) => void } = {
     // DDD Cursed King Siegfried Logic
     'c020': (store, selfId, fromLocation) => {
         // Effect 1: Negate S/T (Quick) - Not implemented for Solo as per request.
@@ -917,7 +917,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                 if (c.id === selfId) return false;
                                 // Special rule for High King Genghis (c019)
                                 if (s3.cards[fusionId].cardId === 'c019') {
-                                    return (c.level || 0) >= 5;
+                                    const selfLevel = s3.cardPropertyModifiers[selfId]?.level ?? s3.cards[selfId].level ?? 0;
+                                    const matLevel = s3.cardPropertyModifiers[c.id]?.level ?? c.level ?? 0;
+                                    return selfLevel >= 5 || matLevel >= 5;
                                 }
                                 return true;
                             },
@@ -1087,9 +1089,13 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                         if (!loc || !locs.includes(loc)) return false;
                                         if (!matFilter(c)) return false;
 
-                                        // Requirement check for c019
-                                        if (isHighKingGenghis && mat1Level < 5) {
-                                            return (c.level || 0) >= 5;
+                                        // Requirement check for c019: One material must be Level 5+
+                                        if (isHighKingGenghis) {
+                                            const m1Mods = store.cardPropertyModifiers[mat1];
+                                            const m2Mods = store.cardPropertyModifiers[c.id];
+                                            const m1Lv = m1Mods?.level ?? store.cards[mat1].level ?? 0;
+                                            const m2Lv = m2Mods?.level ?? c.level ?? 0;
+                                            return m1Lv >= 5 || m2Lv >= 5;
                                         }
                                         return true;
                                     },
@@ -1412,9 +1418,14 @@ const EFFECT_LOGIC: { [cardId: string]: (store: GameStore, selfId: string, fromL
                                             (card) => {
                                                 if (!remaining.includes(card.id)) return false;
                                                 if (!card.name.includes('DD')) return false;
-                                                // High King Genghis requirement
-                                                if (isHighKingGenghis && mat1Level < 5) {
-                                                    return (card.level || 0) >= 5;
+                                                // High King Genghis requirement: One material must be Level 5+
+                                                if (isHighKingGenghis) {
+                                                    const s = useGameStore.getState();
+                                                    const m1Mods = s.cardPropertyModifiers[mat1Id];
+                                                    const m2Mods = s.cardPropertyModifiers[card.id];
+                                                    const m1Lv = m1Mods?.level ?? s.cards[mat1Id].level ?? 0;
+                                                    const m2Lv = m2Mods?.level ?? card.level ?? 0;
+                                                    return m1Lv >= 5 || m2Lv >= 5;
                                                 }
                                                 return true;
                                             },

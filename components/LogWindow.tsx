@@ -22,6 +22,7 @@ export function LogWindow({ onClose, onOpenShare }: LogWindowProps) {
             width: '300px',
             minWidth: '250px',
             height: '100%',
+            margin: 0,
             backgroundColor: 'rgba(0,0,0,0.8)',
             border: '1px solid #444',
             borderRadius: '8px',
