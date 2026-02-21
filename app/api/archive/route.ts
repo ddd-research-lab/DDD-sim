@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// Increase body size limit for large screenshots (Base64)
-export const config = {
-    api: {
-        bodyParser: {
-            sizeLimit: '10mb',
-        },
-    },
-};
-
 export async function GET() {
     try {
         const { data: archives, error } = await supabase

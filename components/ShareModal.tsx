@@ -55,16 +55,19 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error('API failed');
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.details || errorData.error || 'API failed');
+            }
 
             const data = await res.json();
             console.log('Saved Archive ID:', data.id);
 
             alert(formatLog('log_share_success'));
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Share failed:', error);
-            alert(formatLog('log_share_error'));
+            alert(`${formatLog('log_share_error')}\n\n詳細: ${error.message}`);
         } finally {
             setIsSending(false);
         }
