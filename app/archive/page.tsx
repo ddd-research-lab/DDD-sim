@@ -31,12 +31,32 @@ export default function ArchiveListPage() {
             });
     }, []);
 
-    if (loading) return <div style={{ color: '#fff', padding: '20px' }}>Loading...</div>;
+    if (loading) return <div style={{ color: '#fff', padding: '20px' }}>{formatLog('ui_loading')}</div>;
 
     return (
         <div style={{ padding: '20px', color: '#fff' }}>
-            <h1>ルート倉庫</h1>
-            <Link href="/" style={{ color: '#aaa', textDecoration: 'underline' }}>Back to Simulator</Link>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h1 style={{ margin: 0 }}>ルート倉庫</h1>
+                <Link
+                    href="/"
+                    style={{
+                        display: 'inline-block',
+                        padding: '10px 20px',
+                        backgroundColor: '#2196F3',
+                        color: '#fff',
+                        borderRadius: '8px',
+                        textDecoration: 'none',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                        transition: 'transform 0.1s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                    {formatLog('ui_back_to_simulator')}
+                </Link>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>
                 {archives.map(archive => (
@@ -54,7 +74,7 @@ export default function ArchiveListPage() {
                                 {archive.initialSetup}
                             </div>
                             <div style={{ marginTop: '10px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#888' }}>{archive.nickname || 'No Name'}</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#888' }}>{archive.nickname || formatLog('ui_no_name')}</div>
                                 <div style={{ fontSize: '12px', color: '#aaa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span>{new Date(archive.createdAt).toLocaleString()}</span>
                                     <span style={{ color: '#ff4081', display: 'flex', alignItems: 'center', gap: '4px' }}>

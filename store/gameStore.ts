@@ -2057,7 +2057,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             if (validZones.length === 0) return;
 
             startEffectSelection(
-                formatLog('prompt_machinex_ss'),
+                formatLog('prompt_zero_machinex_ss'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                 (choice) => {
                     if (choice === 'yes') {

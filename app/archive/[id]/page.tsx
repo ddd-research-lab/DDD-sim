@@ -56,7 +56,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                 body: JSON.stringify({ userId })
             });
 
-            if (!res.ok) throw new Error('Failed to like');
+            if (!res.ok) throw new Error(formatLog('log_share_error'));
 
             const data = await res.json();
             setArchive({ ...archive, likes: data.likes, likedBy: [...(archive.likedBy || []), userId] });
@@ -78,13 +78,13 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to delete');
+                throw new Error(data.error || formatLog('log_share_error'));
             }
 
             router.push('/archive');
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : 'Failed to delete archive');
+            alert(err instanceof Error ? err.message : formatLog('log_share_error'));
         }
     };
 
@@ -92,14 +92,14 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
     const isAuthor = archive?.authorId === userId;
     const hasLiked = archive?.likedBy?.includes(userId);
 
-    if (loading) return <div style={{ color: '#fff', padding: '20px' }}>Loading...</div>;
-    if (!archive) return <div style={{ color: '#fff', padding: '20px' }}>Archive not found.</div>;
+    if (loading) return <div style={{ color: '#fff', padding: '20px' }}>{formatLog('ui_loading')}</div>;
+    if (!archive) return <div style={{ color: '#fff', padding: '20px' }}>アーカイブが見つかりませんでした。</div>;
 
     return (
         <div style={{ padding: '20px', color: '#fff', maxWidth: '800px', margin: '0 auto' }}>
-            <Link href="/archive" style={{ color: '#aaa', textDecoration: 'underline' }}>&lt; Back to List</Link>
+            <Link href="/archive" style={{ color: '#aaa', textDecoration: 'underline' }}>&lt; {formatLog('ui_back_to_list')}</Link>
 
-            <h2 style={{ marginTop: '10px', fontSize: '14px', color: '#888' }}>{archive.nickname || 'No Name'}</h2>
+            <h2 style={{ marginTop: '10px', fontSize: '14px', color: '#888' }}>{archive.nickname || formatLog('ui_no_name')}</h2>
             <div style={{ color: '#aaa', fontSize: '14px' }}>{new Date(archive.createdAt).toLocaleString()}</div>
 
             {archive.imagePath && (
@@ -175,7 +175,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                             cursor: 'pointer'
                         }}
                     >
-                        Replay in Simulator
+                        {formatLog('ui_replay_in_simulator')}
                     </button>
                 </div>
 
@@ -193,7 +193,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                             marginTop: '10px'
                         }}
                     >
-                        Delete Archive
+                        {formatLog('ui_delete_archive')}
                     </button>
                 )}
             </div>

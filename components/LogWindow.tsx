@@ -13,9 +13,15 @@ export function LogWindow({ onClose, onOpenShare }: LogWindowProps) {
     // 'newest' = descending (latest first), 'oldest' = ascending (oldest first)
     const isAscending = logOrder === 'oldest';
 
-    const displayedLogs = isAscending
-        ? logs.map((log, originalIndex) => ({ log, displayIndex: originalIndex + 1, originalIndex }))
-        : logs.map((log, originalIndex) => ({ log, displayIndex: originalIndex + 1, originalIndex })).reverse();
+    const displayedLogs = logs.map((log, i) => ({
+        log,
+        displayIndex: logs.length - i, // First log added is [1]
+        originalIndex: i
+    }));
+
+    if (isAscending) {
+        displayedLogs.reverse(); // Show oldest (index 1) first
+    }
 
     return (
         <div style={{
@@ -55,7 +61,7 @@ export function LogWindow({ onClose, onOpenShare }: LogWindowProps) {
                     }}
                     title="Toggle Log Order"
                 >
-                    {logOrder === 'newest' ? '▼' : '▲'}
+                    {logOrder === 'newest' ? '▽' : '△'}
                 </button>
                 <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
                 {useGameStore.getState().jumpHistory?.length > 0 && (

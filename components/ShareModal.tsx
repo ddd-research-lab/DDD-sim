@@ -29,11 +29,12 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
                 try {
                     const canvas = await html2canvas(screenshotRef.current, {
                         useCORS: true,
-                        backgroundColor: null, // Transparent if needed, or matches container
+                        backgroundColor: '#1a1a1a', // Ensure a background for the JPEG
                         scale: 1, // Capture at 1:1 scale (1280px width)
-                        logging: true
+                        logging: false
                     });
-                    imageBase64 = canvas.toDataURL('image/png');
+                    // Compress as JPEG with 0.6 quality to stay under 4.5MB limit
+                    imageBase64 = canvas.toDataURL('image/jpeg', 0.6);
                 } catch (e) {
                     console.error('Screenshot failed:', e);
                 }
@@ -56,8 +57,22 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             });
 
             if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.details || errorData.error || 'API failed');
+                let errorMessage = 'API failed';
+                const contentType = res.headers.get('content-type');
+
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await res.json();
+                    errorMessage = errorData.details || errorData.error || errorMessage;
+                } else {
+                    // Handle non-JSON error (like 413 Payload Too Large from Vercel)
+                    const text = await res.text();
+                    if (res.status === 413) {
+                        errorMessage = 'データサイズが大きすぎます。履歴を短くするか、スクリーンショットを調整してください。';
+                    } else {
+                        errorMessage = `Error ${res.status}: ${text.slice(0, 100)}`;
+                    }
+                }
+                throw new Error(errorMessage);
             }
 
             const data = await res.json();

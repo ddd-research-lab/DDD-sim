@@ -156,6 +156,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_lance_soldier_banish_warn': 'DD魔導賢者ランスロットはフィールドから離れると除外されます。',
     'log_defense_soldier_no_targets': 'DDディフェンス・ソルジャーの対象がありません（墓地/表側EXのDD Pモンスター）。',
     'prompt_machinex_ss': 'DDD赦俿王デス・マキナ：EXデッキから特殊召喚しますか？',
+    'prompt_zero_machinex_ss': 'DDD零死王ゼロ・マキナ：EXデッキから特殊召喚しますか？',
     'prompt_destroy_card': 'フィールドのカードを1枚破壊しますか？',
     'prompt_chain_order': 'チェーン順を選択してください（同時発動）。',
     'log_orthros_reset': 'DDオルトロスのP効果制限をリセットしました（Pゾーン配置）。',
@@ -372,6 +373,11 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_share_error': '送信に失敗しました。',
     'ui_save': '保存',
     'ui_archive': 'ルート倉庫',
+    'ui_back_to_simulator': 'シミュレーターへ戻る',
+    'ui_back_to_list': 'リストに戻る',
+    'ui_replay_in_simulator': 'シミュレーターで再生',
+    'ui_delete_archive': 'アーカイブを削除',
+    'ui_no_name': '名前なし',
 };
 
 export const formatLog = (key: string, params: { [key: string]: string } = {}): string => {
