@@ -72,6 +72,7 @@ export interface GameState {
     lastEffectSourceId: string | null;
     isReplaying: boolean;
     isPendulumProcessing: boolean;
+    logCount?: number; // Optional count of logs for optimized history snapshots
 }
 
 export interface DragItem {

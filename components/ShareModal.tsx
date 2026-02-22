@@ -45,15 +45,35 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
                 initialSetup,
                 explanation,
                 history,
-                logs,
+                logs, // Include full logs once at top level
                 image: imageBase64,
                 authorId: getUserId()
             };
 
+            let body = JSON.stringify(payload);
+
+            // If body is still too large (> 4MB), try more aggressive image compression
+            if (body.length > 4 * 1024 * 1024 && screenshotRef.current) {
+                console.log('Payload too large, retrying with higher compression...');
+                try {
+                    const canvas = await html2canvas(screenshotRef.current, {
+                        useCORS: true,
+                        backgroundColor: '#1a1a1a',
+                        scale: 0.8, // Slightly reduce scale
+                        logging: false
+                    });
+                    imageBase64 = canvas.toDataURL('image/jpeg', 0.3); // Lower quality
+                    payload.image = imageBase64;
+                    body = JSON.stringify(payload);
+                } catch (e) {
+                    console.error('Re-compression failed:', e);
+                }
+            }
+
             const res = await fetch('/api/archive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: body
             });
 
             if (!res.ok) {

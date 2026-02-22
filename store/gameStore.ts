@@ -4645,6 +4645,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 isTellBuffActive: state.isTellBuffActive,
                 lastEffectSourceId: state.lastEffectSourceId, // Save this for replay highlighting
                 activeEffectCardId: state.activeEffectCardId, // Save active effect card for replay
+                logCount: state.logs ? state.logs.length : 0, // Store log count instead of full logs array
             };
 
             const newHistory = [...(state.history || []), snapshot];
@@ -4996,10 +4997,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 await new Promise(resolve => setTimeout(resolve, 1333));
                 set({ showPendulumCutIn: false });
             }
-            prevPendulumSummonCount = snapshot.pendulumSummonCount;
+            prevPendulumSummonCount = snapshot.pendulumSummonCount || 0;
+
+            // Reconstruct logs from the master logs array based on logCount
+            const logCount = snapshot.logCount || 0;
+            const fullLogs = get().logs || [];
+            const currentLogs = fullLogs.slice(fullLogs.length - logCount);
 
             set({
                 ...snapshot,
+                logs: currentLogs,
                 currentStepIndex: i,
                 // Ensure UI state from snapshot is respected, but maybe force some things?
                 // Clean UI states that shouldn't persist during replay
@@ -5112,7 +5119,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Ensure derived state / UI is clean
             isReplaying: false,
             currentStepIndex: history.length - 1,
-            logs: initialState.logs || [],
+            logs: archive.logs || initialState.logs || [],
 
             // Clean UI
             searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },
