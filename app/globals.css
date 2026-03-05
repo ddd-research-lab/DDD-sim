@@ -1,0 +1,147 @@
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #3b82f6;
+  --secondary: #1d4ed8;
+  --accent: #f59e0b;
+  --card-bg: #171717;
+  --card-border: #262626;
+  --zone-bg: rgba(255, 255, 255, 0.05);
+  --zone-border: rgba(255, 255, 255, 0.1);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-y: auto;
+  /* Changed from hidden to auto to allow scrolling in Archive pages */
+  /* App-like feel */
+  /* height: 100vh; Removed to allow content to grow */
+  width: 100vw;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+@keyframes green-pulse {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+    border-color: #00ff00;
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+    border-color: #55ff55;
+  }
+
+  100% {
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
+    border-color: #00ff00;
+  }
+}
+
+.trigger-glow {
+  animation: green-pulse 1.5s infinite;
+  border: 2px solid #00ff00 !important;
+  z-index: 50;
+}
+
+/* Layout Classes */
+.main-container {
+  min-height: 100vh;
+  width: 100vw;
+  position: relative;
+  background: radial-gradient(circle at center, #2b1d0e, #000);
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.log-area {
+  width: 320px;
+  border-left: 1px solid #333;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 20px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease-in-out;
+  z-index: 90;
+}
+
+.log-toggle-btn {
+  /* display: none; */
+  /* Enabled for PC */
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  padding: 8px 12px;
+  background-color: #333;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Mobile Landscape Adjustments */
+/* Assuming "mobile landscape" generally means height < width and height is relatively small, 
+   or we can use a max-height media query which is common for phones in landscape.
+   Common phone widths in landscape are 600-900px, heights 300-450px.
+*/
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .game-area {
+    padding: 10px;
+    /* Reduce padding to save space */
+  }
+
+  .log-area {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 300px;
+    /* Slightly narrower */
+    background: rgba(0, 0, 0, 0.95);
+    /* More opaque for overlay */
+    transform: translateX(100%);
+    /* Hidden by default */
+    border-left: 1px solid #444;
+  }
+
+  .log-area.open {
+    transform: translateX(0);
+    /* Slide in */
+  }
+
+  .log-toggle-btn {
+    display: block;
+    /* Show toggle button */
+  }
+}

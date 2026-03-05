@@ -1,0 +1,235 @@
+137: const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocation?: string, summonVariant?: string, isUsedAsMaterial?: boolean) => void } = {
+139: 'c020': (store, selfId, fromLocation) => {
+148: if (store.graveyard.includes(selfId) && fromLocation === 'MONSTER_ZONE') {
+158: store.addLog(formatLog('log_trigger_effect', { card: getCardName(store.cards[selfId], store.language) }));
+166: 'c036': (store, selfId, fromLocation) => {
+167: if (store.spellTrapZones.includes(selfId) && fromLocation === 'HAND') {
+181: useGameStore.getState().moveCard(selfId, 'GRAVEYARD');
+199: finalState.moveCard(selfId, 'GRAVEYARD');
+203: s2.moveCard(selfId, 'GRAVEYARD');
+215: useGameStore.getState().moveCard(selfId, 'HAND');
+219: selfId
+224: 'c004': (store, selfId, fromLocation) => {
+226: if ((store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && fromLocation) {
+229: store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+239: id && id !== selfId && store.cards[id].name.includes('DD')
+273: return onField && card.id !== selfId && card.name.includes('DD');
+280: }, true, selfId
+287: 'c007': (store, selfId, fromLocation) => {
+288: if (!store.monsterZones.includes(selfId) && !store.extraMonsterZones.includes(selfId)) return;
+292: const cardName = store.cards[selfId].name;
+297: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
+304: useGameStore.setState((prev: any) => ({ triggerCandidates: prev.triggerCandidates.filter((id: string) => id !== selfId) }));
+308: store.startEffectSelection(formatLog('prompt_genghis_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+311: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
+315: store.addTurnEffectUsage(usageKey, selfId);
+318: store.addTurnEffectUsage(usageKey, selfId); // Mark as used even before selection to prevent re-trigger during search if moveCard called
+328: store.addTurnEffectUsage(usageKey, selfId);
+337: }, false, selfId);
+339: 'c019': (store, selfId, fromLocation) => {
+342: EFFECT_LOGIC['c007'](store, selfId, fromLocation);
+344: 'c008': (store, selfId, fromLocation) => {
+346: const isMonster = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+347: const isPZone = store.spellTrapZones.includes(selfId);
+352: const name = store.cards[selfId].name;
+360: store.startEffectSelection(formatLog('prompt_ragnarok_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+362: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
+382: }, false, selfId);
+390: const name = store.cards[selfId].name;
+394: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
+402: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
+431: }, false, selfId);
+436: 'c009': (store, selfId, fromLocation) => {
+438: if (store.monsterZones.includes(selfId) && fromLocation) {
+447: (c: any) => isDDArchetype(c) && c.id !== selfId,
+457: }, true, selfId);
+461: 'c012': (store, selfId, fromLocation, summonVariant) => {
+462: const inHand = store.hand.includes(selfId);
+463: const inMZ = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+471: const handDD = currentStore.hand.filter(id => id !== selfId && isDDArchetype(currentStore.cards[id]));
+484: useGameStore.getState().addTurnEffectUsage('c012_hand_ss', selfId);
+504: finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true);
+505: finalState.addLog(formatLog('log_sp_summon_to_mz', { card: getCardName(finalState.cards[selfId], finalState.language), index: (zi + 1).toString() }));
+541: freshState.addLog(formatLog('log_hopt_used', { card: getCardName(freshState.cards[selfId], freshState.language) }));
+552: useGameStore.getState().addTurnEffectUsage('c012_search', selfId);
+555: useGameStore.getState().addTurnEffectUsage('c012_search', selfId); // Mark search effect used
+567: }, true, selfId);
+573: 'c013': (store, selfId, fromLocation, summonVariant) => {
+577: const inHand = store.hand.includes(selfId);
+578: const inMZ = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+579: const inGY = store.graveyard.includes(selfId);
+580: const inED = store.extraDeck.includes(selfId);
+581: const inSTZ = store.spellTrapZones.includes(selfId);
+598: store.addTurnEffectUsage('c013_hand_ss', selfId); // Mark used
+599: useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', false, true);
+609: if (store.spellTrapZones.includes(selfId)) {
+630: store.addTurnEffectUsage('c013_p', selfId);
+632: store.addLog(formatLog('log_activate_effect', { card: getCardName(store.cards[selfId], store.language) }));
+633: useGameStore.setState({ lastEffectSourceId: selfId });
+634: store.addLog(formatLog('log_destroy', { card: getCardName(store.cards[selfId], store.language) }));
+635: store.moveCard(selfId, 'EXTRA_DECK');
+639: }, true, selfId);
+646: if (store.monsterZones.includes(selfId) && store.cardFlags[selfId]?.includes('isPendulumSummoned')) {
+661: useGameStore.getState().addTurnEffectUsage('c013_psummon', selfId);
+672: useGameStore.getState().addTurnEffectUsage('c013_psummon', selfId);
+685: }, true, selfId);
+689: if (store.monsterZones.includes(selfId) && fromLocation === 'GRAVEYARD') {
+693: store.addTurnEffectUsage('c013_gy', selfId);
+705: 'c010': (store, selfId, fromLocation) => {
+707: if (store.spellTrapZones.includes(selfId)) {
+710: store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+724: store.addTurnEffectUsage('c010_p', selfId);
+730: }, false, selfId); // P-Effect: Ash Blossom cannot be used
+734: if (store.monsterZones.includes(selfId)) {
+737: store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+745: useGameStore.setState({ lastEffectSourceId: selfId });
+747: useGameStore.setState({ lastEffectSourceId: selfId });
+749: store.addTurnEffectUsage('c010_m', selfId);
+773: }, true, selfId);
+778: 'c011': (store, selfId, fromLocation, summonVariant) => {
+781: if (store.spellTrapZones.includes(selfId)) {
+787: useGameStore.setState({ lastEffectSourceId: selfId });
+788: store.addLog(formatLog('log_activate_effect', { card: getCardName(store.cards[selfId], store.language) }));
+795: return isOnField && isDDArchetype(c) && c.id !== selfId;
+803: store.addTurnEffectUsage('c011', selfId);
+805: useGameStore.setState({ lastEffectSourceId: selfId });
+807: useGameStore.setState({ lastEffectSourceId: selfId });
+814: }, false, selfId); // P-Effect: Ash Blossom cannot be used
+822: const inHand = store.hand.includes(selfId);
+823: const inMZ = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+834: useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', true, true);
+835: useGameStore.getState().addLog(formatLog('log_sp_summon', { card: getCardName(useGameStore.getState().cards[selfId], useGameStore.getState().language) }));
+841: }, false, selfId);
+845: 'c014': (store, selfId, fromLocation, summonVariant) => {
+847: const inHand = store.hand.includes(selfId);
+848: const inMZ = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+849: const inSTZ = store.spellTrapZones.includes(selfId);
+873: store.addTurnEffectUsage('c014_hand_ss'); // Removed selfId to avoid redundant highlight
+874: store.moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', false, true);
+880: }, false, selfId);
+893: store.addTurnEffectUsage('c014_level_change', selfId);
+894: store.modifyCardProperty(selfId, 'level', 4, 'set');
+898: }, false, selfId);
+903: if ((store.graveyard.includes(selfId) || store.extraDeck.includes(selfId)) && fromLocation) {
+961: }, false, selfId);
+969: id: `c014_deferred_${selfId}_${Date.now()}`,
+980: 'c015': (store, selfId, fromLocation) => {
+985: if (currentStore.graveyard.includes(selfId)) {
+986: const hasOtherDD = currentStore.graveyard.some((id: string) => id !== selfId && isDDArchetype(currentStore.cards[id]));
+1019: if (c.id === selfId) return false;
+1022: const selfLevel = s3.cardPropertyModifiers[selfId]?.level ?? s3.cards[selfId].level ?? 0;
+1032: addTurnEffectUsage('c015_effect', selfId);
+1036: moveCard(selfId, 'BANISHED');
+1039: const slName = getCardName(cards[selfId], useGameStore.getState().language);
+1066: const matNames = [selfId, matId].map((id: string) => getCardName(s.cards[id], s.language)).join(', ');
+1079: }, false, selfId);
+1081: }, false, selfId);
+1086: 'c016': (store, selfId, fromLocation) => {
+1087: if (store.spellTrapZones.includes(selfId)) {
+1099: useGameStore.setState({ lastEffectSourceId: selfId });
+1105: useGameStore.setState({ lastEffectSourceId: selfId });
+1115: }, false, selfId);
+1120: 'c005': (store, selfId, fromLocation) => {
+1121: if (store.spellTrapZones.includes(selfId)) {
+1131: store.addTurnEffectUsage('c005', selfId);
+1134: store.addLog(formatLog('log_trigger_effect', { card: getCardName(store.cards[selfId], store.language) }));
+1145: }, true, selfId);
+1150: 'c006': (store, selfId, fromLocation) => {
+1151: if (store.spellTrapZones.includes(selfId)) {
+1249: }, false, selfId);
+1251: }, false, selfId);
+1255: 'c028': (store, selfId, fromLocation) => {
+1257: const onField = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+1262: useGameStore.setState({ lastEffectSourceId: selfId });
+1268: return isOnField && isDDArchetype(c) && c.id !== selfId;
+1283: }, false, selfId);
+1286: 'c021': (store, selfId, fromLocation) => {
+1292: if (store.graveyard.includes(selfId) && wasOnField && fromLocation !== 'MATERIAL') {
+1309: }, true, selfId);
+1312: if (store.isTellBuffActive && (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && !fromLocation) {
+1313: const materials = store.materials[selfId];
+1321: }, false, selfId);
+1323: }, false, selfId);
+1328: 'c022': (store, selfId, fromLocation) => {
+1329: if (store.graveyard.includes(selfId) && fromLocation !== 'MATERIAL') {
+1347: }, true, selfId);
+1350: 'c023': (store, selfId, fromLocation) => {
+1352: const inGraveyard = store.graveyard.includes(selfId);
+1353: const inMonsterZone = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+1374: }, true, selfId);
+1379: const materials = store.materials[selfId] || [];
+1384: store.startEffectSelection(formatLog('prompt_activate_effect', { card: store.cards[selfId].name }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+1393: store.addLog(formatLog('log_activate_effect', { card: store.cards[selfId].name }));
+1399: }, false, selfId);
+1403: }, false, selfId);
+1408: 'c025': (store, selfId, fromLocation) => {
+1410: if (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) {
+1413: const hasMaterials = store.materials[selfId] && store.materials[selfId].length > 0;
+1420: const materials = store.materials[selfId];
+1428: store.addLog(formatLog('log_detach_material', { card: getCardName(store.cards[selfId], store.language), material: getCardName(store.cards[matId], store.language) }));
+1451: }, false, selfId
+1454: }, true, selfId
+1461: 'c026': (store, selfId, fromLocation) => {
+1463: if ((store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && fromLocation) {
+1502: }, false, selfId
+1507: 'c027': (store, selfId, fromLocation) => {
+1510: if (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) {
+1625: }, false, selfId
+1630: selfId
+1634: if (store.banished.includes(selfId)) {
+1671: finalState.addTurnEffectUsage('c027', selfId);
+1682: selfId
+1689: 'c017': (store, selfId, fromLocation) => {
+1694: if ((store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && fromLocation) {
+1749: selfId // activatorId
+1757: 'c030': (store, selfId, fromLocation, summonVariant, isUsedAsMaterial) => {
+1759: if (store.spellTrapZones.includes(selfId)) {
+1761: if (store.cardFlags[selfId]?.includes('c030_locked')) {
+1781: store.addTurnEffectUsage(usageKey, selfId);
+1793: }, false, selfId);
+1800: if (store.graveyard.includes(selfId) || store.extraDeck.includes(selfId)) {
+1802: if (fromLocation === 'TRIGGER' && store.extraDeck.includes(selfId)) {
+1804: formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }),
+1807: useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter((id: string) => id !== selfId) }));
+1813: useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
+1814: store.addLog(formatLog('log_activate_effect', { card: getCardName(store.cards[selfId], store.language) }));
+1827: selfId
+1845: store.addTurnEffectUsage(usageKey, selfId);
+1846: store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyP[0], undefined, false, true);
+1848: const newFlags = store.cardFlags[selfId] ? [...store.cardFlags[selfId], 'c030_locked'] : ['c030_locked'];
+1849: useGameStore.setState(prev => ({ cardFlags: { ...prev.cardFlags, [selfId]: newFlags } }));
+1852: }, false, selfId);
+1862: 'c032': (store: GameStore, selfId: string, fromLocation?: string) => {
+1867: if (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) {
+1898: }, false, selfId);
+1902: }, false, selfId
+1909: if (store.graveyard.includes(selfId)) {
+1913: store.addLog(formatLog('log_effect_already_used', { card: getCardName(store.cards[selfId], store.language) }));
+1933: useGameStore.setState({ lastEffectSourceId: selfId });
+1943: useGameStore.getState().moveCard(selfId, type, index, 'GRAVEYARD', false, true);
+1945: store.setCardFlag(selfId, 'BANISH_ON_LEAVE');
+1960: }, false, selfId
+1966: 'c033': (store: GameStore, selfId: string, fromLocation?: string) => {
+1970: const inMonsterZone = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
+1971: const inGraveyard = store.graveyard.includes(selfId);
+2000: if (!store.monsterZones.includes(selfId) && !store.extraMonsterZones.includes(selfId)) {
+2024: if (!store.graveyard.includes(selfId)) {
+2029: store.moveCard(selfId, 'BANISHED');
+2030: store.addLog(formatLog('log_banish', { card: store.cards[selfId].name }));
+2095: }, false, selfId);
+2099: 'c034': (store: GameStore, selfId: string, fromLocation?: string) => {
+2101: const inHand = store.hand.includes(selfId);
+2102: const inSTZone = store.spellTrapZones.includes(selfId);
+2110: if (!id || id === selfId) return false;
+2123: formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }),
+2131: store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyST[0], 'HAND');
+2146: useGameStore.setState({ lastEffectSourceId: selfId });
+2168: }, true, selfId
+2250: }, false, selfId
+2255: }, false, selfId
+2591: }, false, selfId
+3078: }, false, selfId
+3671: }, false, selfId
+3696: }, false, selfId
+4329: store.startEffectSelection(formatLog('prompt_select_xyz_type'), options, (val) => doXyz(val), false, selfId);
+5015: }, false, selfId

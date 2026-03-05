@@ -1,0 +1,56 @@
+168: store.startEffectSelection(
+245: store.startEffectSelection(
+308: store.startEffectSelection(formatLog('prompt_genghis_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+360: store.startEffectSelection(formatLog('prompt_ragnarok_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+400: store.startEffectSelection(formatLog('prompt_ragnarok_p_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+442: store.startEffectSelection(formatLog('prompt_copernicus_dump'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+468: store.startEffectSelection(formatLog('prompt_count_surveyor_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+549: store.startEffectSelection(formatLog('prompt_count_surveyor_search_0'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+593: store.startEffectSelection(formatLog('prompt_gryphon_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+621: store.startEffectSelection(formatLog('prompt_gryphon_p_atk_up'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+658: store.startEffectSelection(formatLog('prompt_gryphon_draw'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+691: store.startEffectSelection(formatLog('prompt_gryphon_gy_return'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+713: store.startEffectSelection(formatLog('prompt_thomas_p_return'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+740: store.startEffectSelection(formatLog('prompt_thomas_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+785: store.startEffectSelection(formatLog('prompt_orthros_p_destroy'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+826: store.startEffectSelection(formatLog('prompt_orthros_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+868: store.startEffectSelection(formatLog('prompt_scale_surveyor_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+891: store.startEffectSelection(formatLog('prompt_scale_surveyor_level_change'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+938: s.startEffectSelection(formatLog('prompt_scale_surveyor_bounce'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+989: store.startEffectSelection(formatLog('prompt_necro_slime_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1010: s.startEffectSelection(formatLog('label_fusion_monster_select'), fusionOptions, (fusionId: string) => {
+1089: store.startEffectSelection(formatLog('prompt_witch_destroy'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1128: store.startEffectSelection(formatLog('prompt_gate_search'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+1166: store.startEffectSelection(formatLog('prompt_swamp_king_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1168: store.startEffectSelection(formatLog('label_fusion_monster_select'), fusionOptions, (fusionId: string) => {
+1260: store.startEffectSelection(formatLog('prompt_zeus_extra_p'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1293: store.startEffectSelection(formatLog('prompt_tell_send_gy'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+1315: store.startEffectSelection(formatLog('prompt_tell_detach'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1317: store.startEffectSelection(formatLog('prompt_select_material'), materials.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })), (matId: string) => {
+1335: store.startEffectSelection(formatLog('prompt_caesar_add_contract'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated: boolean) => {
+1362: store.startEffectSelection(formatLog('prompt_caesar_add_contract'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated: boolean) => {
+1384: store.startEffectSelection(formatLog('prompt_activate_effect', { card: store.cards[selfId].name }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+1396: store.startEffectSelection(formatLog('prompt_select_material'), mats.map((mid: string) => ({ label: store.cards[mid].name, value: mid })), (mid: string) => {
+1415: store.startEffectSelection(
+1421: store.startEffectSelection(
+1478: store.startEffectSelection(
+1512: store.startEffectSelection(
+1519: store.startEffectSelection(
+1639: store.startEffectSelection(
+1696: store.startEffectSelection(
+1774: store.startEffectSelection(formatLog('prompt_machinex_p_place'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1803: store.startEffectSelection(
+1843: store.startEffectSelection(formatLog('prompt_machinex_destruction_p'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+1882: store.startEffectSelection(
+1893: store.startEffectSelection(formatLog('prompt_lance_level_select', { max: String(contractCount) }), options, (val: string) => {
+1920: store.startEffectSelection(
+1995: store.startEffectSelection(formatLog('prompt_defense_soldier_activate'), [
+2122: store.startEffectSelection(
+2215: startEffectSelection(
+2228: useGameStore.getState().startEffectSelection(
+2563: s2.startEffectSelection(
+3068: cs.startEffectSelection(
+3663: s.startEffectSelection(
+3679: s.startEffectSelection(
+4329: store.startEffectSelection(formatLog('prompt_select_xyz_type'), options, (val) => doXyz(val));
+4954: get().startEffectSelection(formatLog('prompt_tribute_summon', { card: getCardName(card, get().language) }),

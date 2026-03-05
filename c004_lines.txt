@@ -1,0 +1,5 @@
+224: 'c004': (store, selfId, fromLocation) => {
+228: if (useGameStore.getState().turnEffectUsage['c004']) {
+250: useGameStore.getState().addTurnEffectUsage('c004');
+253: useGameStore.getState().addTurnEffectUsage('c004'); // Use getState() to ensure freshest reference
+264: useGameStore.getState().addTurnEffectUsage('c004'); // Use getState() to ensure freshest reference

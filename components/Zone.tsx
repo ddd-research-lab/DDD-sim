@@ -1,0 +1,98 @@
+import React from 'react';
+import { useDroppable } from '@dnd-kit/core';
+import { ZoneType } from '@/types';
+
+interface ZoneProps {
+    id: string; // Unique ID for droppable
+    type: ZoneType;
+    index?: number; // Index in the zone array
+    children?: React.ReactNode;
+    isOver?: boolean;
+    // Visual props
+    label?: string;
+    bgLabel?: string;
+    style?: React.CSSProperties;
+}
+
+import { useGameStore } from '@/store/gameStore';
+// ZoneType is already imported above
+
+export function Zone({ id, type, index, children, label, bgLabel, style: customStyle }: ZoneProps) {
+    const { isOver, setNodeRef } = useDroppable({
+        id: id,
+        data: { type, index },
+    });
+
+    const zoneSelectionState = useGameStore((state) => state.zoneSelectionState);
+    const resolveZoneSelection = useGameStore((state) => state.resolveZoneSelection);
+    const fieldColor = useGameStore((state) => state.fieldColor);
+
+    const isSelectingZone = zoneSelectionState.isOpen;
+    const zoneSelectionFilter = zoneSelectionState.filter;
+
+    const isValidTarget = isSelectingZone && zoneSelectionFilter && typeof index === 'number' && zoneSelectionFilter(type, index);
+
+    const handleClick = () => {
+        if (isSelectingZone && zoneSelectionFilter && typeof index === 'number') {
+            const check = zoneSelectionFilter(type, index);
+            if (!check) return;
+        }
+
+        if (isValidTarget && typeof index === 'number') {
+            resolveZoneSelection(type, index);
+            return;
+        }
+    };
+
+    const style: React.CSSProperties = {
+        width: '90px',
+        height: '130px',
+        border: isValidTarget ? '2px solid #0f0' : '1px dashed var(--zone-border)',
+        backgroundColor: isOver ? 'rgba(255, 255, 255, 0.15)' : (isValidTarget ? 'rgba(0, 255, 0, 0.1)' : (fieldColor || 'var(--zone-bg)')),
+        borderRadius: '6px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background-color 0.2s, border 0.2s',
+        margin: '4px',
+        position: 'relative',
+        cursor: isValidTarget ? 'pointer' : 'default',
+        zIndex: isValidTarget ? 10 : 1, // Bring to front if selectable
+    };
+
+    return (
+        <div ref={setNodeRef} style={{ ...style, ...customStyle }} onClick={handleClick}>
+            {bgLabel && (
+                <span style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: 'rgba(255,255,255,0.1)',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 0
+                }}>
+                    {bgLabel}
+                </span>
+            )}
+            <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {children}
+            </div>
+            {!children && label && (
+                <span style={{
+                    position: 'absolute',
+                    color: 'rgba(255,255,255,0.2)',
+                    fontSize: '10px',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 2
+                }}>
+                    {label}
+                </span>
+            )}
+        </div>
+    );
+}
