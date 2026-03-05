@@ -398,7 +398,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
     // Arc Crisis Summon Logic
     const startArcCrisisSummon = (arcCrisisId: string) => {
         const store = useGameStore.getState();
-        store.addLog(formatLog('log_arc_crisis_init'));
+        // store.addLog(formatLog('log_arc_crisis_init'));
 
         // Collect candidates from field (Monsters + P-Zones) and graveyard
         const fieldMonsterIds = [...store.monsterZones, ...store.extraMonsterZones].filter((id): id is string => id !== null);
@@ -437,7 +437,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 return r;
             }).join('/');
 
-            currentStore.addLog(formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: reqLabels }));
+            // currentStore.addLog(formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: reqLabels }));
 
             // Filter valid candidates
             const validCandidates = allCandidates.filter(id => {
@@ -576,16 +576,17 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
                 // Banish all materials
                 materialIds.forEach(id => {
-                    finalStore.moveCard(id, 'BANISHED');
-                    finalStore.addLog(formatLog('log_banished', { card: getCardName(finalStore.cards[id], finalStore.language) }));
+                    finalStore.moveCard(id, 'BANISHED', 0, undefined, true);
+                    // finalStore.addLog(formatLog('log_banished', { card: getCardName(finalStore.cards[id], finalStore.language) }));
                 });
 
                 // Reset material move flag
                 useGameStore.setState({ isMaterialMove: false });
 
                 // Summon Arc Crisis
-                finalStore.moveCard(arcCrisisId, type, index, undefined, false, true);
-
+                const materialsLabel = materialIds.map(id => getCardName(finalStore.cards[id], finalStore.language)).join('&');
+                finalStore.moveCard(arcCrisisId, type, index, undefined, true, true);
+                finalStore.addLog(formatLog('log_arc_crisis_success_with_mats', { materials: materialsLabel }));
 
                 finalStore.clearSelectedCards();
 

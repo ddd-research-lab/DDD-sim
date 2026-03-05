@@ -119,6 +119,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_arc_crisis_no_zone': 'Arc Crisisを出す空きゾーンがありません',
     'log_banished': '{card} を除外',
     'log_arc_crisis_success': 'DDDD超次元統皇ゼロ・パラドックスを特殊召喚！',
+    'log_arc_crisis_success_with_mats': 'クライシスを特殊召喚（{materials}を除外）',
     'log_alfred_no_ddd': 'Alfred効果: フィールドにDDモンスターがいません',
     'log_alfred_no_contract': 'Alfred効果: 墓地・除外ゾーンに「契約書」カードがありません',
     'log_alfred_placed_multiple': '{cards}を置く（DDD聖賢王アルフレッド効果）',
