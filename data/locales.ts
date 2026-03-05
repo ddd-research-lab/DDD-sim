@@ -428,6 +428,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'ui_zeus_negate': 'ラグナロクで無効',
     'prompt_zeus_negate_cost_contract': 'コストとして除外する「契約書」カードを選択してください。',
     'prompt_zeus_negate_cost_dd': 'コストとして除外する「DD」モンスターを選択してください。',
+    'log_zeus_negate_success': '{cost1}と{cost2}を除外して{target}を無効（DDD天空王ゼウス・ラグナロク効果）',
 };
 
 export const formatLog = (key: string, params: { [key: string]: string } = {}): string => {

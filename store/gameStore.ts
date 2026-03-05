@@ -2639,9 +2639,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                             (c: any) => contractCardsInGy.includes(c.id) && c.id !== ddToBanish,
                                             (contractToBanish: string) => {
                                                 const s5 = get();
-                                                s5.moveCard(ddToBanish, 'BANISHED');
-                                                s5.moveCard(contractToBanish, 'BANISHED');
-                                                s5.addLog(s5.language === 'ja' ? 'ニビルの効果が無効化されました！' : 'Nibiru\'s effect was negated!');
+                                                const ddName = getCardName(s5.cards[ddToBanish], s5.language);
+                                                const contractName = getCardName(s5.cards[contractToBanish], s5.language);
+                                                s5.moveCard(ddToBanish, 'BANISHED', undefined, undefined, false, false, undefined, true);
+                                                s5.moveCard(contractToBanish, 'BANISHED', undefined, undefined, false, false, undefined, true);
+                                                s5.addLog(formatLog('log_zeus_negate_success', {
+                                                    cost1: ddName,
+                                                    cost2: contractName,
+                                                    target: s5.language === 'ja' ? 'ニビル' : 'Nibiru'
+                                                }));
                                             },
                                             s4.language === 'ja' ? '無効化コストとして除外する「契約書」カードを選択' : 'Select "Dark Contract" to banish',
                                             s4.graveyard
@@ -4566,22 +4572,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 }
                                 if (t === 'EXTRA_MONSTER_ZONE') {
                                     // DEUS MACHINEX Exception: Allow if replacing the target (Overlay)
-                                    // If the zone has the target material, it's valid validation.
                                     if (s.extraMonsterZones[i] === targetId) return true;
 
-                                    // Otherwise, apply standard EMZ rules? 
-                                    // If we are summoning to a DIFFERENT zone, we need to check occupancy.
-                                    // Standard Rule: Can only use EMZ if empty (or valid linked).
-                                    // And we must respect "1 EMZ per player" rule loosely.
-
-                                    // If occupied by someone else, return false
+                                    // If target is NOT in this EMZ, we must respect standard EMZ occupancy rules.
+                                    // 1. Zone must be empty.
                                     if (s.extraMonsterZones[i] !== null) return false;
 
-                                    // If empty, allow? 
-                                    // Only if we are not "stealing" the slot while holding another?
-                                    // Simplified: If target is in MMZ, we can maybe move to EMZ?
-                                    // But typically Overlay stays in same zone. 
-                                    // Let's just allow Empty EMZ + Target EMZ.
+                                    // 2. Extra Monster Zone Restriction (1 per player).
+                                    // If the OTHER EMZ is occupied by a card that is NOT the target monster (which will stay/leave depending on rules, but here it's the target),
+                                    // then this EMZ cannot be used.
+                                    const otherEmzIdx = 1 - i;
+                                    const otherOccupant = s.extraMonsterZones[otherEmzIdx];
+                                    if (otherOccupant !== null && otherOccupant !== targetId) {
+                                        return false;
+                                    }
+
                                     return true;
                                 }
                                 return false;
@@ -4917,30 +4922,109 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     options: currentOptions,
                     onSelect: (val) => {
                         useGameStore.setState({ effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null } });
+                        const performZeusCheck = (resolveEffect: () => void, negateEffect: () => void, targetNameJa: string, targetNameEn: string) => {
+                            const s2 = get();
+                            const hasZeusRagnarok = [...s2.monsterZones, ...s2.extraMonsterZones].some(
+                                (id) => id && s2.cards[id] && s2.cards[id].cardId === 'c028'
+                            );
+
+                            let ddCardsInGy: string[] = [];
+                            let contractCardsInGy: string[] = [];
+
+                            s2.graveyard.forEach(id => {
+                                const c = s2.cards[id];
+                                if (!c) return;
+                                if (c.name.includes('DD') || c.nameJa?.includes('DD')) ddCardsInGy.push(id);
+                                if (c.name.includes('Dark Contract') || c.nameJa?.includes('契約書')) contractCardsInGy.push(id);
+                            });
+
+                            const canPayZeusCost = ddCardsInGy.length > 0 && contractCardsInGy.length > 0 && (ddCardsInGy.length + contractCardsInGy.length > 1 || (ddCardsInGy[0] !== contractCardsInGy[0]));
+
+                            if (hasZeusRagnarok && canPayZeusCost) {
+                                s2.startEffectSelection(
+                                    s2.language === 'ja' ? '墓地の「DD」と「契約書」を除外し「DDD天空王ゼウス・ラグナロク」の効果で無効にしますか？' : 'Banish 1 "DD" and 1 "Dark Contract" from GY to negate with "DDDD Sky King Zeus Ragnarok"?',
+                                    [{ label: s2.language === 'ja' ? 'はい' : 'Yes', value: 'yes' }, { label: s2.language === 'ja' ? 'いいえ' : 'No', value: 'no' }],
+                                    (choice: string) => {
+                                        if (choice === 'yes') {
+                                            const s3 = get();
+                                            s3.startSearch(
+                                                (c: any) => ddCardsInGy.includes(c.id),
+                                                (ddToBanish: string) => {
+                                                    const s4 = get();
+                                                    s4.startSearch(
+                                                        (c: any) => contractCardsInGy.includes(c.id) && c.id !== ddToBanish,
+                                                        (contractToBanish: string) => {
+                                                            const s5 = get();
+                                                            const ddName = getCardName(s5.cards[ddToBanish], s5.language);
+                                                            const contractName = getCardName(s5.cards[contractToBanish], s5.language);
+                                                            s5.moveCard(ddToBanish, 'BANISHED', undefined, undefined, false, false, undefined, true);
+                                                            s5.moveCard(contractToBanish, 'BANISHED', undefined, undefined, false, false, undefined, true);
+                                                            s5.addLog(formatLog('log_zeus_negate_success', {
+                                                                cost1: ddName,
+                                                                cost2: contractName,
+                                                                target: s5.language === 'ja' ? targetNameJa : targetNameEn
+                                                            }));
+                                                            negateEffect();
+                                                        },
+                                                        s4.language === 'ja' ? '無効化コストとして除外する「契約書」カードを選択' : 'Select "Dark Contract" to banish',
+                                                        s4.graveyard
+                                                    );
+                                                },
+                                                s3.language === 'ja' ? '無効化コストとして除外する「DD」カードを選択' : 'Select "DD" card to banish',
+                                                s3.graveyard
+                                            );
+                                        } else {
+                                            resolveEffect();
+                                        }
+                                    }
+                                );
+                            } else {
+                                resolveEffect();
+                            }
+                        };
+
                         if (val === 'ash_blossom') {
-                            set({ ashBlossomUsed: true, showAshBlossomCutIn: true });
-                            get().addLog(formatLog('log_ash_blossom_negated'));
-                            get().pushHistory();
-                            setTimeout(() => {
-                                set({ showAshBlossomCutIn: false });
+                            const resolveAshBlossom = () => {
+                                set({ ashBlossomUsed: true, showAshBlossomCutIn: true });
+                                get().addLog(formatLog('log_ash_blossom_negated'));
                                 get().pushHistory();
-                            }, 1333);
-                            onSelect(options[0].value, true);
-                            get().processUiQueue();
+                                setTimeout(() => {
+                                    set({ showAshBlossomCutIn: false });
+                                    get().pushHistory();
+                                }, 1333);
+                                onSelect(options[0].value, true);
+                                get().processUiQueue();
+                            };
+                            const negateAshBlossom = () => {
+                                set({ ashBlossomUsed: true }); // Activate, but negated
+                                get().pushHistory();
+                                onSelect(options[0].value, false);
+                                get().processUiQueue();
+                            };
+                            performZeusCheck(resolveAshBlossom, negateAshBlossom, '灰流うらら', 'Ash Blossom');
                             return;
                         }
 
                         if (val === 'infinite_impermanence') {
-                            set({ showInfiniteImpermanenceCutIn: true, infiniteImpermanenceUsed: true });
-                            const activatorCard = state.cards[activatorId!];
-                            get().addLog(formatLog('log_infinite_impermanence_negated', { card: getCardName(activatorCard, state.language) }));
-                            get().pushHistory();
-                            setTimeout(() => {
-                                set({ showInfiniteImpermanenceCutIn: false });
+                            const resolveImpermanence = () => {
+                                set({ showInfiniteImpermanenceCutIn: true, infiniteImpermanenceUsed: true });
+                                const activatorCard = state.cards[activatorId!];
+                                get().addLog(formatLog('log_infinite_impermanence_negated', { card: getCardName(activatorCard, state.language) }));
                                 get().pushHistory();
-                            }, 1333);
-                            onSelect(options[0].value, true);
-                            get().processUiQueue();
+                                setTimeout(() => {
+                                    set({ showInfiniteImpermanenceCutIn: false });
+                                    get().pushHistory();
+                                }, 1333);
+                                onSelect(options[0].value, true);
+                                get().processUiQueue();
+                            };
+                            const negateImpermanence = () => {
+                                set({ infiniteImpermanenceUsed: true }); // Activate, but negated
+                                get().pushHistory();
+                                onSelect(options[0].value, false);
+                                get().processUiQueue();
+                            };
+                            performZeusCheck(resolveImpermanence, negateImpermanence, '無限泡影', 'Infinite Impermanence');
                             return;
                         }
 
