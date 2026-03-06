@@ -54,11 +54,25 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             // Join non-empty IDs with commas
             const initialSetupString = initialSetupIds.filter(id => id !== '').join(',');
 
+            // Compress history data to reduce payload size
+            const minifiedHistory = history.map(state => {
+                const minifiedState = { ...state };
+                if (minifiedState.cards) {
+                    const minifiedCards: Record<string, any> = {};
+                    for (const [id, card] of Object.entries(minifiedState.cards)) {
+                        const { description, pendulumEffect, name, nameJa, image, ...essentialCardData } = card as any;
+                        minifiedCards[id] = essentialCardData;
+                    }
+                    minifiedState.cards = minifiedCards;
+                }
+                return minifiedState;
+            });
+
             const payload = {
                 nickname,
                 initialSetup: initialSetupString,
                 explanation,
-                history,
+                history: minifiedHistory,
                 logs, // Include full logs once at top level
                 image: imageBase64,
                 authorId: getUserId()

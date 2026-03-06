@@ -5772,14 +5772,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const { history } = archive;
         if (!history || !Array.isArray(history) || history.length === 0) return;
 
+        // Restore missing static properties (description, etc.) removed during minification
+        const restoredHistory = history.map((state: any) => {
+            const restoredState = { ...state };
+            if (restoredState.cards) {
+                const restoredCards: Record<string, any> = {};
+                for (const [id, card] of Object.entries(restoredState.cards) as any) {
+                    const baseDef = CARD_DATABASE[card.cardId];
+                    if (baseDef) {
+                        restoredCards[id] = {
+                            ...baseDef,
+                            ...card // Instance overrides like state, location, ATK/DEF modifiers
+                        };
+                    } else {
+                        restoredCards[id] = card;
+                    }
+                }
+                restoredState.cards = restoredCards;
+            }
+            return restoredState;
+        });
+
         // Reset to final state of the replay per user request
-        const initialState = history[history.length - 1];
+        const initialState = restoredHistory[restoredHistory.length - 1];
         set({
             ...initialState,
-            history: history,
+            history: restoredHistory,
             // Ensure derived state / UI is clean
             isReplaying: false,
-            currentStepIndex: history.length - 1,
+            currentStepIndex: restoredHistory.length - 1,
             logs: archive.logs || initialState.logs || [],
 
             // Clean UI

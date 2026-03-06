@@ -585,7 +585,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
                 // Summon Arc Crisis
                 const materialsLabel = materialIds.map(id => getCardName(finalStore.cards[id], finalStore.language)).join('&');
-                finalStore.moveCard(arcCrisisId, type, index, undefined, true, true);
+                finalStore.moveCard(arcCrisisId, type, index, undefined, true, true, undefined, true);
                 finalStore.addLog(formatLog('log_arc_crisis_success_with_mats', { materials: materialsLabel }));
 
                 finalStore.clearSelectedCards();
