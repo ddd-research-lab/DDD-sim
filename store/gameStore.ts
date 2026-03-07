@@ -413,12 +413,10 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     s2.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
                                         const s3 = useGameStore.getState();
                                         const targetName = getCardName(store.cards[tid], s3.language);
-                                        const sourceName = getCardName(store.cards[selfId], s3.language) + ' (P効果)';
                                         s3.moveCard(tid, 'MONSTER_ZONE', i, 'GRAVEYARD', false, true, undefined, true);
-                                        s3.changeLP(-1000);
+                                        s3.changeLP(-1000, true); // true as 2nd arg to skip default damage log
                                         useGameStore.setState({ isTellBuffActive: true });
-                                        s3.addLog(formatLog('log_ragnarok_ss', { card: targetName, source: sourceName }));
-                                        s3.addLog(formatLog('log_take_damage', { amount: '1000' }));
+                                        s3.addLog(formatLog('log_c008_p_ss_combined', { card: targetName, amount: '1000' }));
                                     });
                                 }
                             },
@@ -2087,56 +2085,20 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.addLog(formatLog('log_error_condition'));
                     return;
                 }
-                // Cost: Banish self
-                store.moveCard(selfId, 'BANISHED');
-                store.addLog(formatLog('log_banish', { card: store.cards[selfId].name }));
-
                 // Filter: DD P-Monster in GY or face-up ED (Except Machinex, Ark Crisis)
                 const isDDP = (c: Card) => isDDArchetype(c) && c.subType?.includes('PENDULUM') && c.cardId !== 'c018' && c.cardId !== 'c029';
 
-                // Re-fetch state to get current locations (though self is already in GY/Banished)
+                // Re-fetch state
                 const s = useGameStore.getState();
 
                 const extraP = s.extraDeck.filter(id => {
                     const c = s.cards[id];
                     const isEDType = c.subType?.includes('FUSION') || c.subType?.includes('SYNCHRO') || c.subType?.includes('XYZ') || c.subType?.includes('LINK');
-                    // Face-up ED P-Monsters are those in Extra Deck that are PENDULUM match.
-                    // Note: Face-down ED cards are also in extraDeck. 
-                    // Sim doesn't strictly distinguish face-up/down in array, but usually Face-Up P-Monsters are just in there.
-                    // However, valid targets for "Add to Hand" from ED must be Face-Up.
-                    // Rule: P-Monsters go to ED face-up when destroyed.
-                    // We assume all P-Monsters in ED are candidates?
-                    // No, fusion/synchro/xyz P-Monsters might be face-down if not used yet?
-                    // Actually, main deck P-monsters in ED are always face-up.
-                    // Hybrids (Fusion/P) like Ark Crisis start face-down.
-                    // But effectively, if it's in ED and matches "DD P-Monster", we can treat it as valid target if it's "Face-Up".
-                    // Standard P-Monsters (Main Deck types) in ED are always Face-Up.
-                    // Hybrid P-Monsters ... if they are there, they are likely Face-Up or Face-Down.
-                    // Let's filter by: Main Deck P-Monsters OR Hybrid P-Monsters that are explicitly Face-Up?
-                    // Sim workaround: Allow all non-Hybrid P-Monsters. Hybrids are usually excluded by specific CardId checks?
-                    // User said: "Except Machinex (c030 - Wait c030 is Machinex) and Ark Crisis (c029)".
-                    // c018 is Machinex (XYZ/P). c029 is Ark Crisis (Fusion/P).
-                    // c030 is Zero Machinex (P/Effect - Main Deck?). No, c030 is "Zero Doom Queen Machinex" (P/Effect).
-                    // Wait, let's check definitions.
-                    // c030 is "DDD Zero Doom Queen Machinex" -> PENDULUM/EFFECT (Main Deck).
-                    // c018 is "DDD Deviser King Deus Machinex" -> XYZ/PENDULUM.
-                    // User said "Except Machinex and Ark Crisis".
-                    // They likely mean the Extra Deck Hybrids: Deus Machinex (c018) and Ark Crisis (c029).
-                    // And maybe Zero Machinex (c030) if it's in ED? It's a Main Deck P-monster, so if it's in ED, it's Face-Up.
-                    // User said "Ex Deck (Deus Machinex, Ark Crisis except)".
-                    // So we must allow Main Deck P-Monsters.
-                    // Current filter: !isEDType && isDDP.
-                    // isEDType blocks Fusion/Synchro/Xyz/Link.
-                    // This correctly blocks Deus Machinex (Xyz) and Ark Crisis (Fusion).
-                    // Does it block anything else?
-                    // Genghis, etc are not P-Monsters.
-                    // So `!isEDType` allows Main Deck P-Monsters.
-
                     return !isEDType && isDDP(c);
                 });
 
                 const graveP = s.graveyard.filter(id => isDDP(s.cards[id]));
-                const uniqueTargets = Array.from(new Set([...extraP, ...graveP])); // Deduplicate to be safe
+                const uniqueTargets = Array.from(new Set([...extraP, ...graveP]));
 
                 if (uniqueTargets.length === 0) {
                     store.addLog(formatLog('log_defense_soldier_no_targets'));
@@ -2146,9 +2108,20 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 store.startSearch(
                     (c: any) => uniqueTargets.includes(c.id),
                     (sid: string) => {
-                        store.moveCard(sid, 'HAND');
-                        // Log handled by moveCard
-                        store.addTurnEffectUsage('c033_gy_search');
+                        const finalStore = useGameStore.getState();
+                        const selfName = getCardName(finalStore.cards[selfId], finalStore.language);
+                        const targetName = getCardName(finalStore.cards[sid], finalStore.language);
+
+                        // 1. Banish self (Cost) - skipLog: true
+                        finalStore.moveCard(selfId, 'BANISHED', undefined, undefined, false, false, undefined, true);
+
+                        // 2. Add target to hand - skipLog: true
+                        finalStore.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true);
+
+                        // 3. Add combined log
+                        finalStore.addLog(formatLog('log_c033_gy_ss', { card: selfName, target: targetName }));
+
+                        finalStore.addTurnEffectUsage('c033_gy_search');
                     },
                     formatLog('prompt_select_dd_p'),
                     uniqueTargets // Pass PRE-FILTERED list to SearchModal source to avoid searching whole deck
@@ -2395,7 +2368,7 @@ interface GameStore extends GameState {
     initializeGame: (cardDefs: CardDatabase, deckList: string[]) => void;
     // Move Card Generic Action
     moveCard: (cardId: string, toZone: ZoneType, toIndex?: number, fromLocation?: string, suppressTrigger?: boolean, isSpecialSummon?: boolean, summonVariant?: string, skipLog?: boolean) => void;
-    changeLP: (amount: number) => void;
+    changeLP: (amount: number, skipLog?: boolean) => void;
     addLog: (message: string) => void;
     setDragState: (isDragging: boolean, id: string | null) => void;
     startSearch: (filter: (card: Card) => boolean, onSelect: (cardId: string) => void, prompt?: string, sourceList?: string[]) => void;
@@ -5130,9 +5103,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
     },
 
-    changeLP: (amount) => {
+    changeLP: (amount, skipLog = false) => {
         get().pushHistory();
         set((state) => ({ lp: state.lp + amount }));
+        if (!skipLog) {
+            get().addLog(formatLog('log_take_damage', { amount: Math.abs(amount).toString() }));
+        }
     },
 
     setCardFlag: (cardId, flag) => set((state) => {
@@ -5751,7 +5727,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== cardId) }));
             const cardDef = store.cards[cardId];
             if (cardDef && EFFECT_LOGIC[cardDef.cardId]) {
-                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019') {
+                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019' && cardDef.cardId !== 'c008') {
                     store.addLog(formatLog('log_trigger_activated', { card: getCardName(cardDef, store.language) }));
                 }
                 // Execute logic as 'TRIGGER'
