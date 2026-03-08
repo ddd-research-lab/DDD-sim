@@ -128,9 +128,8 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             // Check if we can find the required 4 materials from field or graveyard
             // Check if we can find the required 4 materials from field or graveyard
             const fieldMonsterIds = [...monsterZones, ...useGameStore.getState().extraMonsterZones].filter((id): id is string => id !== null);
-            const pZoneIds = [spellTrapZones[0], spellTrapZones[4]].filter((id): id is string => id !== null);
             const gyMonsterIds = graveyard.filter(id => cards[id]?.type === 'MONSTER');
-            const allCandidates = [...fieldMonsterIds, ...pZoneIds, ...gyMonsterIds];
+            const allCandidates = [...fieldMonsterIds, ...gyMonsterIds];
 
             // Need: 1 Fusion, 1 Synchro, 1 Xyz, 1 Pendulum (Deus Machinex c018 can be Xyz OR Pendulum)
             const candidateCards = allCandidates.map(id => cards[id]);
@@ -400,11 +399,10 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         const store = useGameStore.getState();
         // store.addLog(formatLog('log_arc_crisis_init'));
 
-        // Collect candidates from field (Monsters + P-Zones) and graveyard
+        // Collect candidates from field (Monsters) and graveyard
         const fieldMonsterIds = [...store.monsterZones, ...store.extraMonsterZones].filter((id): id is string => id !== null);
-        const pZoneIds = [store.spellTrapZones[0], store.spellTrapZones[4]].filter((id): id is string => id !== null);
         const gyMonsterIds = store.graveyard.filter(id => store.cards[id]?.type === 'MONSTER');
-        const allCandidates = [...fieldMonsterIds, ...pZoneIds, ...gyMonsterIds];
+        const allCandidates = [...fieldMonsterIds, ...gyMonsterIds];
 
 
         const requirements = ['FUSION', 'SYNCHRO', 'XYZ', 'PENDULUM'];
@@ -642,7 +640,6 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                     const placedCount = { count: 0 };
                     const placeNextContract = () => {
                         if (placedCount.count >= dddCount) {
-                            useGameStore.getState().addLog(formatLog('log_alfred_placed_count', { count: placedCount.count.toString() }));
                             return;
                         }
 
@@ -654,7 +651,6 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                         });
 
                         if (remaining.length === 0) {
-                            s.addLog(formatLog('log_alfred_placed_card', { count: placedCount.count.toString() }));
                             return;
                         }
 
@@ -666,7 +662,6 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                             ],
                             (selected) => {
                                 if (selected === 'done') {
-                                    useGameStore.getState().addLog(formatLog('log_alfred_placed_count', { count: placedCount.count.toString() }));
                                     return;
                                 }
 
@@ -675,7 +670,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                                 const emptySTIdx = s2.spellTrapZones.findIndex((v, i) => v === null && i !== 0 && i !== 4);
 
                                 if (emptySTIdx !== -1) {
-                                    s2.moveCard(selected, 'SPELL_TRAP_ZONE', emptySTIdx);
+                                    s2.moveCard(selected, 'SPELL_TRAP_ZONE', emptySTIdx, undefined, false, false, undefined, true);
                                     s2.addLog(formatLog('log_alfred_placed_card', { card: getCardName(s2.cards[selected], s2.language) }));
                                     placedCount.count++;
                                     placeNextContract();

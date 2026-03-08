@@ -954,15 +954,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     const s3 = useGameStore.getState();
                                     s3.addTurnEffectUsage('c014_bounce'); // Consume HOPT
                                     const cardDef = s3.cards[selectedId];
-                                    const isExMonster = cardDef.subType?.includes('FUSION') || cardDef.subType?.includes('SYNCHRO') || cardDef.subType?.includes('XYZ') || cardDef.subType?.includes('LINK');
-
-                                    if (isExMonster) {
-                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, undefined, true);
-                                        s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
-                                    } else {
-                                        s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
-                                        s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
-                                    }
+                                    s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
+                                    s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
                                 },
                                 formatLog('prompt_select_card'),
                                 candidates
@@ -1775,7 +1768,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                             }
                                             if (updated) useGameStore.setState({ cardFlags: newFlagsState });
 
-                                            s3.changeLP(-1000);
+                                            s3.changeLP(-1000, true);
                                             useGameStore.setState({ isTellBuffActive: true });
                                             s3.addLog(formatLog('log_gilgamesh_p_place_damage', { card1: nameA, card2: nameB, amount: '1000' }));
 

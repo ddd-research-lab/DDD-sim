@@ -45,9 +45,7 @@ export function PendulumSummonModal() {
             <div style={{ marginBottom: '20px', color: '#fff', fontSize: '24px', fontWeight: 'bold' }}>
                 {formatLog('ui_pendulum_summon_selection')}
             </div>
-            <div style={{ marginBottom: '10px', color: '#ccc', fontSize: '16px' }}>
-                {formatLog('ui_pendulum_summon_instruction')}
-            </div>
+
 
             <div style={{
                 display: 'flex',
