@@ -403,6 +403,17 @@ export default function Home() {
         return;
       }
 
+      // Rule: Block drag from any field zone to Hand
+      const fromField = fromMonsterZone ||
+        store.spellTrapZones.includes(activeId) ||
+        store.fieldZone === activeId;
+      if (fromField && zoneType === 'HAND') {
+        console.warn('Cannot drag field card to Hand.');
+        setDragState(false, null);
+        setActiveCard(null);
+        return;
+      }
+
       console.log('Dropped', activeId, 'on', zoneType, index);
       moveCard(activeId, zoneType, index);
     }

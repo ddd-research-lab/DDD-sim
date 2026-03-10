@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatLog, getCardName } from '@/data/locales';
 import { CARD_DATABASE } from '@/data/cards';
+import { getUserId } from '@/lib/userId';
 
 interface Archive {
     id: string;
@@ -13,6 +14,7 @@ interface Archive {
     createdAt: string;
     imagePath?: string;
     likes: number;
+    likedBy?: string[];
 }
 
 export default function ArchiveListPage() {
@@ -38,16 +40,22 @@ export default function ArchiveListPage() {
             });
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.isComposing) return;
             if (e.key === 'x' || e.key === 'X') xKeyPressed.current = true;
         };
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.key === 'x' || e.key === 'X') xKeyPressed.current = false;
         };
+        const handleBlur = () => {
+            xKeyPressed.current = false;
+        };
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleBlur);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleBlur);
         };
     }, []);
 
@@ -87,6 +95,39 @@ export default function ArchiveListPage() {
         }
     };
 
+    const handleLikeAction = async (e: React.MouseEvent, archive: Archive) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (xKeyPressed.current) {
+            xKeyPressed.current = false; // Reset to prevent stuck state from prompt()
+            handleAdminDelete(e, archive.id);
+            return;
+        }
+
+        const userId = getUserId();
+        if (archive.likedBy?.includes(userId)) return;
+
+        try {
+            const res = await fetch(`/api/archive/${archive.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+
+            if (!res.ok) throw new Error('Like failed');
+
+            const data = await res.json();
+            setArchives(prev => prev.map(a =>
+                a.id === archive.id
+                    ? { ...a, likes: data.likes, likedBy: [...(a.likedBy || []), userId] }
+                    : a
+            ));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const handleDownload = (e: React.MouseEvent, imagePath: string, id: string) => {
         e.preventDefault();
         e.stopPropagation();
@@ -121,6 +162,8 @@ export default function ArchiveListPage() {
         const query = searchQuery.toLowerCase();
         return resolvedNames.includes(query) || rawSetup.includes(query);
     });
+
+    const userId = getUserId();
 
     if (loading) return <div style={{ color: '#fff', padding: '20px' }}>{formatLog('ui_loading')}</div>;
 
@@ -261,22 +304,25 @@ export default function ArchiveListPage() {
                             </div>
                             <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                                 <button
-                                    onClick={(e) => handleAdminDelete(e, archive.id)}
-                                    title="X を押しながらクリックで削除（管理者専用）"
+                                    onClick={(e) => handleLikeAction(e, archive)}
+                                    title="いいね（Xキーを押しながらで管理者削除）"
+                                    disabled={archive.likedBy?.includes(userId)}
                                     style={{
-                                        color: '#ff4081',
+                                        color: archive.likedBy?.includes(userId) ? '#ff4081' : '#888',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px',
-                                        background: 'rgba(255,64,129,0.1)',
-                                        padding: '2px 8px',
+                                        background: archive.likedBy?.includes(userId) ? 'rgba(255,64,129,0.1)' : 'rgba(136,136,136,0.1)',
+                                        padding: '4px 10px',
                                         borderRadius: '12px',
                                         border: 'none',
-                                        cursor: 'pointer',
+                                        cursor: archive.likedBy?.includes(userId) ? 'default' : 'pointer',
                                         fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        transition: 'all 0.2s',
                                     }}
                                 >
-                                    <span style={{ fontSize: '14px' }}>♥</span> {archive.likes}
+                                    <span style={{ fontSize: '14px' }}>{archive.likedBy?.includes(userId) ? '♥' : '♡'}</span> {archive.likes || 0}
                                 </button>
                             </div>
                         </Link>

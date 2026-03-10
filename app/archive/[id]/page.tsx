@@ -204,32 +204,28 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {archive.imagePath && (
-                <div style={{ margin: '20px 0', border: '1px solid #444', padding: '5px', background: '#000', position: 'relative' }}>
+                <div style={{ margin: '20px 0' }}>
                     <img
                         src={archive.imagePath}
-                        alt="Board Snapshot"
-                        style={{ width: '100%', height: 'auto' }}
-                    />
-                    <button
+                        alt="Board State"
+                        style={{ width: '100%', borderRadius: '8px', cursor: 'pointer' }}
                         onClick={handleDownload}
-                        style={{
-                            position: 'absolute',
-                            bottom: '10px',
-                            right: '10px',
-                            background: 'rgba(0,0,0,0.7)',
-                            color: '#fff',
-                            border: '1px solid #666',
-                            borderRadius: '4px',
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                        }}
-                    >
-                        <span>💾</span> {formatLog('ui_download_image')}
-                    </button>
+                    />
+                    <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                        <button
+                            onClick={handleDownload}
+                            style={{
+                                background: '#333',
+                                color: '#fff',
+                                border: '1px solid #555',
+                                borderRadius: '4px',
+                                padding: '8px 16px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            画像として保存
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -362,7 +358,6 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                         <span style={{ fontSize: '20px' }}>{hasLiked ? '♥' : '♡'}</span>
                         {archive.likes || 0}
                     </button>
-
                     <button
                         onClick={handleReplay}
                         style={{
@@ -376,7 +371,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                             cursor: 'pointer'
                         }}
                     >
-                        {formatLog('ui_replay_in_simulator')}
+                        {formatLog('ui_replay_in_simulator') || 'シミュレーターでこの手札から再生'}
                     </button>
                 </div>
 

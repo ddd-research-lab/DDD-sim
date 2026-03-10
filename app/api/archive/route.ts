@@ -5,7 +5,7 @@ export async function GET() {
     try {
         const { data: archives, error } = await supabase
             .from('archives')
-            .select('id, nickname, initial_setup, explanation, created_at, image_path, likes')
+            .select('id, nickname, initial_setup, explanation, created_at, image_path, likes, liked_by')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -18,7 +18,8 @@ export async function GET() {
             explanation: a.explanation,
             createdAt: a.created_at,
             imagePath: a.image_path,
-            likes: a.likes || 0
+            likes: a.likes || 0,
+            likedBy: a.liked_by || []
         }));
 
         return NextResponse.json(summary);

@@ -490,8 +490,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     if (emptyIndices.length > 0) {
                                         cs.startZoneSelection(formatLog('prompt_select_zone'), (t: string, zi: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(zi), (t: string, zi: number) => {
                                             const finalState = useGameStore.getState();
-                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, `mats:（コスト：${costName}）`);
-                                            // Log handled by moveCard
+                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, undefined, true);
+                                            finalState.addLog(`${getCardName(finalState.cards[selfId], finalState.language)}を特殊召喚（カウント効果：コスト・${costName}）`);
+                                            // Log handled above
 
 
                                             // 3. Process Batch
@@ -1232,7 +1233,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                                 const s = useGameStore.getState();
                                                 const name1 = getCardName(s.cards[mat1], s.language);
                                                 const name2 = getCardName(s.cards[mat2], s.language);
-                                                s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}`);
+                                                s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}：魔神王効果`);
 
                                                 store.addTurnEffectUsage('c006');
                                             });
@@ -1340,7 +1341,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.startSearch(
                         (card: any) => card.name.includes('Dark Contract') || card.name.includes('契約書'),
                         (selectedId: any) => {
-                            store.moveCard(selectedId, 'HAND');
+                            store.addLog(formatLog('log_caesar_search', { card: getCardName(store.cards[selectedId], store.language) }));
+                            store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -1367,7 +1369,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.startSearch(
                         (card: any) => card.name.includes('Dark Contract') || card.name.includes('契約書'),
                         (selectedId: any) => {
-                            store.moveCard(selectedId, 'HAND');
+                            store.addLog(formatLog('log_caesar_search', { card: getCardName(store.cards[selectedId], store.language) }));
+                            store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -2446,7 +2449,7 @@ interface GameStore extends GameState {
     isReplaying: boolean;
     activeEffectCardId: string | null;
     setActiveEffectCard: (cardId: string | null) => void;
-    replay: () => void;
+    replay: (skipSnapshot?: boolean) => void;
     stopReplay: () => void;
     originalZoneOrder: string[] | null; // For GY/Banished display reset
     isHistoryBatching: boolean;
@@ -3639,6 +3642,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     } else if (isSpecialSummon) {
                         const variant = summonVariant?.toLowerCase();
                         if (variant === 'fusion') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_fusion_summon_to_emz' : 'log_fusion_summon_to_mz';
+                        else if (variant?.startsWith('mats:')) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_fusion_summon_to_emz' : 'log_fusion_summon_to_mz';
                         else if (variant === 'synchro') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_synchro_summon_to_emz' : 'log_synchro_summon_to_mz';
                         else if (variant === 'xyz') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_xyz_summon_to_emz' : 'log_xyz_summon_to_mz';
                         else if (variant === 'link') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_link_summon_to_emz' : 'log_link_summon_to_mz';
@@ -3651,6 +3655,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const isPZone = toIndex === 0 || toIndex === 4;
                     if (isPendulum && isPZone) {
                         logKey = 'log_pendulum_setting';
+                    } else if (card.type === 'TRAP') {
+                        logKey = 'log_set_trap';
                     } else {
                         logKey = 'log_move_to_stz';
                     }
@@ -3693,6 +3699,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         combinedLog = combinedLog.replace('を特殊召喚', 'を融合召喚');
                     } else if (summonVariant === 'SYNCHRO') {
                         combinedLog = combinedLog.replace('を特殊召喚', 'をシンクロ召喚');
+                    } else if (summonVariant.startsWith('link:')) {
+                        combinedLog = combinedLog.replace('を特殊召喚', 'をリンク召喚');
                     }
                 }
 
@@ -5470,7 +5478,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
 
             if (validIndices.length === 0) {
-                state.addLog(formatLog('log_no_valid_zones_for_card', { card: getCardName(card, state.language) }));
                 processNext(remainingIds.slice(1), placements);
                 return;
             }
@@ -5669,7 +5676,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Detect Pendulum Summon
             const p1 = sZones ? sZones[0] : null;
             const p4 = sZones ? sZones[4] : null;
-            if (sCount > prevPendulumSummonCount && p1 && p4) {
+            const isP1Pendulum = p1 && snapshot.cards && snapshot.cards[p1]?.subType?.includes('PENDULUM');
+            const isP4Pendulum = p4 && snapshot.cards && snapshot.cards[p4]?.subType?.includes('PENDULUM');
+
+            if (sCount > prevPendulumSummonCount && isP1Pendulum && isP4Pendulum) {
                 set({ showPendulumCutIn: true });
                 await new Promise(resolve => setTimeout(resolve, 1333));
                 set({ showPendulumCutIn: false });
