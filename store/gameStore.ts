@@ -133,6 +133,15 @@ const isDDArchetype = (card: any): boolean => {
     return n.includes('DD') || n.includes('DARK CONTRACT') || nj.includes('DD') || nj.includes('契約書');
 };
 
+// Strict DD Card identification (includes c034 which is treated as a DD card)
+const isStrictlyDDCard = (card: any): boolean => {
+    if (!card) return false;
+    if (card.cardId === 'c034') return true;
+    const n = (card.name || '').toUpperCase();
+    const nj = (card.nameJa || '');
+    return n.includes('DD') && !n.includes('DARK CONTRACT') && !nj.includes('契約書');
+};
+
 // Effect helper logic
 const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocation?: string, summonVariant?: string, isUsedAsMaterial?: boolean) => void } = {
 
@@ -224,8 +233,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
             const options = [{ label: formatLog('label_contract_search_deck'), value: 'search' }];
 
-            const hasDDToReturn = [...store.monsterZones, ...store.extraMonsterZones].some(id =>
-                id && id !== selfId && store.cards[id].name.includes('DD')
+            const hasDDToReturn = [...store.monsterZones, ...store.extraMonsterZones, ...store.spellTrapZones].some(id =>
+                id && id !== selfId && isDDArchetype(store.cards[id])
             );
             if (hasDDToReturn) {
                 options.push({ label: formatLog('label_dd_return_field'), value: 'return' });
@@ -262,8 +271,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                         if (isNegated) return;
                         store.startTargeting(
                             (card: any) => {
-                                const onField = store.monsterZones.includes(card.id) || store.extraMonsterZones.includes(card.id);
-                                return onField && card.id !== selfId && card.name.includes('DD');
+                                const onField = store.monsterZones.includes(card.id) || store.extraMonsterZones.includes(card.id) || store.spellTrapZones.includes(card.id);
+                                return onField && card.id !== selfId && isDDArchetype(card);
                             },
                             (targetId: string) => {
                                 const cardName = getCardName(useGameStore.getState().cards[targetId], store.language);
@@ -413,10 +422,12 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     s2.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
                                         const s3 = useGameStore.getState();
                                         const targetName = getCardName(store.cards[tid], s3.language);
+                                        const sourceName = getCardName(store.cards[selfId], s3.language) + ' (P効果)';
                                         s3.moveCard(tid, 'MONSTER_ZONE', i, 'GRAVEYARD', false, true, undefined, true);
-                                        s3.changeLP(-1000, true); // true as 2nd arg to skip default damage log
+                                        s3.changeLP(-1000);
                                         useGameStore.setState({ isTellBuffActive: true });
-                                        s3.addLog(formatLog('log_c008_p_ss_combined', { card: targetName, amount: '1000' }));
+                                        s3.addLog(formatLog('log_ragnarok_ss', { card: targetName, source: sourceName }));
+                                        s3.addLog(formatLog('log_take_damage', { amount: '1000' }));
                                     });
                                 }
                             },
@@ -490,9 +501,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     if (emptyIndices.length > 0) {
                                         cs.startZoneSelection(formatLog('prompt_select_zone'), (t: string, zi: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(zi), (t: string, zi: number) => {
                                             const finalState = useGameStore.getState();
-                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, undefined, true);
-                                            finalState.addLog(`${getCardName(finalState.cards[selfId], finalState.language)}を特殊召喚（カウント効果：コスト・${costName}）`);
-                                            // Log handled above
+                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, `mats:（コスト：${costName}）`);
+                                            // Log handled by moveCard
 
 
                                             // 3. Process Batch
@@ -808,10 +818,21 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     // Set Source ID right before each move to ensure Machinex sees it
                                     store.addTurnEffectUsage('c011', selfId);
                                     store.addLog(formatLog('log_orthros_destroy', { card: getCardName(store.cards[tid1], store.language), target: getCardName(store.cards[tid2], store.language) }));
-                                    useGameStore.setState({ lastEffectSourceId: selfId });
-                                    store.moveCard(tid1, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
-                                    useGameStore.setState({ lastEffectSourceId: selfId });
-                                    store.moveCard(tid2, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                                    // Use batching to ensure both cards are in GY before triggers run
+                                    const wasBatching = store.isBatching;
+                                    if (!wasBatching) useGameStore.setState({ isBatching: true });
+                                    try {
+                                        useGameStore.setState({ lastEffectSourceId: selfId });
+                                        store.moveCard(tid1, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                                        useGameStore.setState({ lastEffectSourceId: selfId });
+                                        store.moveCard(tid2, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                                    } finally {
+                                        if (!wasBatching) {
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().processPendingEffects();
+                                            useGameStore.getState().processUiQueue();
+                                        }
+                                    }
                                 }
                             );
                         }
@@ -917,7 +938,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             }
 
             // Start of candidate check logic (extracted for pre-check)
-            const getCandidates = (s: GameStore) => {
+            const getCandidates = (s: any) => {
                 const currentFieldCards = [
                     ...s.monsterZones,
                     ...s.extraMonsterZones,
@@ -955,8 +976,15 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     const s3 = useGameStore.getState();
                                     s3.addTurnEffectUsage('c014_bounce'); // Consume HOPT
                                     const cardDef = s3.cards[selectedId];
-                                    s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
-                                    s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
+                                    const isExMonster = cardDef.subType?.includes('FUSION') || cardDef.subType?.includes('SYNCHRO') || cardDef.subType?.includes('XYZ') || cardDef.subType?.includes('LINK');
+
+                                    if (isExMonster) {
+                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, undefined, true);
+                                        s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
+                                    } else {
+                                        s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
+                                        s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
+                                    }
                                 },
                                 formatLog('prompt_select_card'),
                                 candidates
@@ -1233,7 +1261,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                                 const s = useGameStore.getState();
                                                 const name1 = getCardName(s.cards[mat1], s.language);
                                                 const name2 = getCardName(s.cards[mat2], s.language);
-                                                s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}：魔神王効果`);
+                                                s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}`);
 
                                                 store.addTurnEffectUsage('c006');
                                             });
@@ -1341,8 +1369,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.startSearch(
                         (card: any) => card.name.includes('Dark Contract') || card.name.includes('契約書'),
                         (selectedId: any) => {
-                            store.addLog(formatLog('log_caesar_search', { card: getCardName(store.cards[selectedId], store.language) }));
-                            store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
+                            const cardName = getCardName(store.cards[selectedId], store.language);
+                            store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
+                            store.addLog(formatLog('log_caesar_search', { card: cardName }));
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -1369,8 +1398,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.startSearch(
                         (card: any) => card.name.includes('Dark Contract') || card.name.includes('契約書'),
                         (selectedId: any) => {
-                            store.addLog(formatLog('log_caesar_search', { card: getCardName(store.cards[selectedId], store.language) }));
-                            store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
+                            const cardName = getCardName(store.cards[selectedId], store.language);
+                            store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
+                            store.addLog(formatLog('log_caesar_search', { card: cardName }));
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -1423,7 +1453,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                         if (choice === 'yes') {
                             const materials = store.materials[selfId];
                             store.startEffectSelection(
-                                '取り除く素材を選択：',
+                                '取り除く素材を選択してください：',
                                 materials.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })),
                                 (matId: string) => {
                                     useGameStore.setState({ isBatching: true });
@@ -1440,15 +1470,15 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
                                         store.startSearch(
                                             (card: any) => {
-                                                const n = (card.name || '').toUpperCase();
-                                                const nj = (card.nameJa || '');
-                                                return n.includes('DD') || nj.includes('DD') || card.cardId === 'c034';
+                                                const nameJa = card.nameJa || '';
+                                                return nameJa.includes('DD');
                                             },
                                             (selectedId: string) => {
                                                 store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
                                                 store.addLog(formatLog('log_solomon_search', { card: getCardName(store.cards[selectedId], store.language) }));
                                             },
-                                            formatLog('prompt_select_card')
+                                            formatLog('prompt_select_card'),
+                                            store.deck
                                         );
 
                                     } finally {
@@ -1761,17 +1791,17 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                             // Lock c030 if placed
                                             const newFlagsState = { ...s3.cardFlags };
                                             let updated = false;
-                                            if (s3.cards[id1].cardId === 'c030') {
+                                            if (s3.cards[id1].cardId === 'c030' || s3.cards[id1].cardId === 'c018' || s3.cards[id1].cardId === 'c029') {
                                                 newFlagsState[id1] = [...(newFlagsState[id1] || []), 'c030_locked'];
                                                 updated = true;
                                             }
-                                            if (s3.cards[id2].cardId === 'c030') {
+                                            if (s3.cards[id2].cardId === 'c030' || s3.cards[id2].cardId === 'c018' || s3.cards[id2].cardId === 'c029') {
                                                 newFlagsState[id2] = [...(newFlagsState[id2] || []), 'c030_locked'];
                                                 updated = true;
                                             }
                                             if (updated) useGameStore.setState({ cardFlags: newFlagsState });
 
-                                            s3.changeLP(-1000, true);
+                                            s3.changeLP(-1000);
                                             useGameStore.setState({ isTellBuffActive: true });
                                             s3.addLog(formatLog('log_gilgamesh_p_place_damage', { card1: nameA, card2: nameB, amount: '1000' }));
 
@@ -1830,6 +1860,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                 store.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'SPELL_TRAP_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
                                     const placedCardName = getCardName(store.cards[id], store.language);
                                     store.moveCard(id, t as any, i, 'DECK', false, true, undefined, true); // Treat as Place/Activate, skip default log
+                                    // Set Source ID right before each move to ensure Machinex sees it
+                                    useGameStore.setState({ lastEffectSourceId: selfId });
                                     store.addLog(formatLog('log_zero_machinex_set_contract', { card: placedCardName }));
                                 });
                             },
@@ -1890,11 +1922,11 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.startEffectSelection(formatLog('prompt_zero_machinex_destruction_p'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
                         if (choice === 'yes') {
                             store.addTurnEffectUsage(usageKey, selfId);
-                            store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyP[0], undefined, false, true);
+                            store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyP[0], undefined, false, true, undefined, true);
                             // Set Flag
                             const newFlags = store.cardFlags[selfId] ? [...store.cardFlags[selfId], 'c030_locked'] : ['c030_locked'];
                             useGameStore.setState(prev => ({ cardFlags: { ...prev.cardFlags, [selfId]: newFlags } }));
-                            store.addLog(formatLog('log_place_pzone', { card: getCardName(store.cards[selfId], store.language) }));
+                            store.addLog(formatLog('log_c030_place_pzone', { card: getCardName(store.cards[selfId], store.language) }));
                         }
                     }, false, selfId);
                 }
@@ -1906,7 +1938,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
     // DD Lance Soldier Logic
     // DD Lance Soldier Logic (c032)
-    'c032': (store: GameStore, selfId: string, fromLocation?: string) => {
+    'c032': (store, selfId, fromLocation) => {
         // Global Guard: Manual Activation Only (Ignition Effects)
         if (fromLocation) return;
 
@@ -2019,7 +2051,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
     },
 
     // DD Defense Soldier Logic (c033)
-    'c033': (store: GameStore, selfId: string, fromLocation?: string) => {
+    'c033': (store, selfId, fromLocation) => {
         // Global Guard: Manual Activation Only
         if (fromLocation) return;
 
@@ -2081,20 +2113,56 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     store.addLog(formatLog('log_error_condition'));
                     return;
                 }
+                // Cost: Banish self
+                store.moveCard(selfId, 'BANISHED');
+                store.addLog(formatLog('log_banish', { card: store.cards[selfId].name }));
+
                 // Filter: DD P-Monster in GY or face-up ED (Except Machinex, Ark Crisis)
                 const isDDP = (c: Card) => isDDArchetype(c) && c.subType?.includes('PENDULUM') && c.cardId !== 'c018' && c.cardId !== 'c029';
 
-                // Re-fetch state
+                // Re-fetch state to get current locations (though self is already in GY/Banished)
                 const s = useGameStore.getState();
 
                 const extraP = s.extraDeck.filter(id => {
                     const c = s.cards[id];
                     const isEDType = c.subType?.includes('FUSION') || c.subType?.includes('SYNCHRO') || c.subType?.includes('XYZ') || c.subType?.includes('LINK');
+                    // Face-up ED P-Monsters are those in Extra Deck that are PENDULUM match.
+                    // Note: Face-down ED cards are also in extraDeck. 
+                    // Sim doesn't strictly distinguish face-up/down in array, but usually Face-Up P-Monsters are just in there.
+                    // However, valid targets for "Add to Hand" from ED must be Face-Up.
+                    // Rule: P-Monsters go to ED face-up when destroyed.
+                    // We assume all P-Monsters in ED are candidates?
+                    // No, fusion/synchro/xyz P-Monsters might be face-down if not used yet?
+                    // Actually, main deck P-monsters in ED are always face-up.
+                    // Hybrids (Fusion/P) like Ark Crisis start face-down.
+                    // But effectively, if it's in ED and matches "DD P-Monster", we can treat it as valid target if it's "Face-Up".
+                    // Standard P-Monsters (Main Deck types) in ED are always Face-Up.
+                    // Hybrid P-Monsters ... if they are there, they are likely Face-Up or Face-Down.
+                    // Let's filter by: Main Deck P-Monsters OR Hybrid P-Monsters that are explicitly Face-Up?
+                    // Sim workaround: Allow all non-Hybrid P-Monsters. Hybrids are usually excluded by specific CardId checks?
+                    // User said: "Except Machinex (c030 - Wait c030 is Machinex) and Ark Crisis (c029)".
+                    // c018 is Machinex (XYZ/P). c029 is Ark Crisis (Fusion/P).
+                    // c030 is Zero Machinex (P/Effect - Main Deck?). No, c030 is "Zero Doom Queen Machinex" (P/Effect).
+                    // Wait, let's check definitions.
+                    // c030 is "DDD Zero Doom Queen Machinex" -> PENDULUM/EFFECT (Main Deck).
+                    // c018 is "DDD Deviser King Deus Machinex" -> XYZ/PENDULUM.
+                    // User said "Except Machinex and Ark Crisis".
+                    // They likely mean the Extra Deck Hybrids: Deus Machinex (c018) and Ark Crisis (c029).
+                    // And maybe Zero Machinex (c030) if it's in ED? It's a Main Deck P-monster, so if it's in ED, it's Face-Up.
+                    // User said "Ex Deck (Deus Machinex, Ark Crisis except)".
+                    // So we must allow Main Deck P-Monsters.
+                    // Current filter: !isEDType && isDDP.
+                    // isEDType blocks Fusion/Synchro/Xyz/Link.
+                    // This correctly blocks Deus Machinex (Xyz) and Ark Crisis (Fusion).
+                    // Does it block anything else?
+                    // Genghis, etc are not P-Monsters.
+                    // So `!isEDType` allows Main Deck P-Monsters.
+
                     return !isEDType && isDDP(c);
                 });
 
                 const graveP = s.graveyard.filter(id => isDDP(s.cards[id]));
-                const uniqueTargets = Array.from(new Set([...extraP, ...graveP]));
+                const uniqueTargets = Array.from(new Set([...extraP, ...graveP])); // Deduplicate to be safe
 
                 if (uniqueTargets.length === 0) {
                     store.addLog(formatLog('log_defense_soldier_no_targets'));
@@ -2104,20 +2172,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 store.startSearch(
                     (c: any) => uniqueTargets.includes(c.id),
                     (sid: string) => {
-                        const finalStore = useGameStore.getState();
-                        const selfName = getCardName(finalStore.cards[selfId], finalStore.language);
-                        const targetName = getCardName(finalStore.cards[sid], finalStore.language);
-
-                        // 1. Banish self (Cost) - skipLog: true
-                        finalStore.moveCard(selfId, 'BANISHED', undefined, undefined, false, false, undefined, true);
-
-                        // 2. Add target to hand - skipLog: true
-                        finalStore.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true);
-
-                        // 3. Add combined log
-                        finalStore.addLog(formatLog('log_c033_gy_ss', { card: selfName, target: targetName }));
-
-                        finalStore.addTurnEffectUsage('c033_gy_search');
+                        store.moveCard(sid, 'HAND');
+                        // Log handled by moveCard
+                        store.addTurnEffectUsage('c033_gy_search');
                     },
                     formatLog('prompt_select_dd_p'),
                     uniqueTargets // Pass PRE-FILTERED list to SearchModal source to avoid searching whole deck
@@ -2127,7 +2184,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
     },
 
     // Dark Contract with the Zero King (c034)
-    'c034': (store: GameStore, selfId: string, fromLocation?: string) => {
+    'c034': (store, selfId, fromLocation) => {
         // [1] Target 1 other "DD" card; destroy it, SS "DD" from Deck.
         const inHand = store.hand.includes(selfId);
         const inSTZone = store.spellTrapZones.includes(selfId);
@@ -2206,7 +2263,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
 
     // Deus Machinex Reaction
-    'c030_reaction': (store: GameStore, extraDeckId: string) => {
+    'c030_reaction': (store, extraDeckId) => {
         const execute = () => {
             const s = useGameStore.getState();
             const usageKey = 'c030_ss_reaction';
@@ -2256,14 +2313,14 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                             (type: string, index: number) => validZones.some(vz => vz.type === type && vz.index === index),
                             (type: string, index: number) => {
                                 const cardName = getCardName(s.cards[extraDeckId], s.language);
+                                // Skip individual SS log
                                 moveCard(extraDeckId, type as any, index, undefined, false, true, undefined, true);
-                                addLog(formatLog('log_c030_ss', { card: cardName }));
+                                
                                 useGameStore.getState().startEffectSelection(
                                     formatLog('prompt_destroy_card'),
                                     [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                                     (dChoiceValue: string) => {
                                         if (dChoiceValue === 'yes') {
-
                                             useGameStore.getState().startTargeting(
                                                 (targetCard: any) => {
                                                     const ss = useGameStore.getState();
@@ -2274,11 +2331,22 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                                 },
                                                 (targetCardId: string) => {
                                                     useGameStore.setState({ lastEffectSourceId: extraDeckId });
-                                                    moveCard(targetCardId, 'GRAVEYARD');
-                                                    addLog(formatLog('log_destroy', { card: getCardName(s.cards[targetCardId], s.language) }));
+                                                    const targetName = getCardName(s.cards[targetCardId], s.language);
+                                                    
+                                                    // Combined Log
+                                                    if (targetCardId === extraDeckId) {
+                                                        addLog(formatLog('log_c030_ss_self_destruct', { card: cardName }));
+                                                    } else {
+                                                        addLog(formatLog('log_c030_ss_destroy', { card: cardName, target: targetName }));
+                                                    }
+
+                                                    // Move card with skipLog = true to avoid redundant "Destroyed" log
+                                                    moveCard(targetCardId, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
                                                 }
                                             );
-
+                                        } else {
+                                            // No destruction, just SS log
+                                            addLog(formatLog('log_c030_ss', { card: cardName }));
                                         }
                                     }, false, extraDeckId
                                 );
@@ -2364,7 +2432,7 @@ interface GameStore extends GameState {
     initializeGame: (cardDefs: CardDatabase, deckList: string[]) => void;
     // Move Card Generic Action
     moveCard: (cardId: string, toZone: ZoneType, toIndex?: number, fromLocation?: string, suppressTrigger?: boolean, isSpecialSummon?: boolean, summonVariant?: string, skipLog?: boolean) => void;
-    changeLP: (amount: number, skipLog?: boolean) => void;
+    changeLP: (amount: number) => void;
     addLog: (message: string) => void;
     setDragState: (isDragging: boolean, id: string | null) => void;
     startSearch: (filter: (card: Card) => boolean, onSelect: (cardId: string) => void, prompt?: string, sourceList?: string[]) => void;
@@ -2449,7 +2517,7 @@ interface GameStore extends GameState {
     isReplaying: boolean;
     activeEffectCardId: string | null;
     setActiveEffectCard: (cardId: string | null) => void;
-    replay: (skipSnapshot?: boolean) => void;
+    replay: () => void;
     stopReplay: () => void;
     originalZoneOrder: string[] | null; // For GY/Banished display reset
     isHistoryBatching: boolean;
@@ -2879,6 +2947,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             triggerCandidates: [], // Reset triggers
             modalQueue: [],
             pendingChain: [],
+            pendingEffects: [],
             isBatching: false,
             searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },
             effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null },
@@ -2886,6 +2955,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
             zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
             history: [], // Reset history
             currentStepIndex: -1, // Initialize currentStepIndex
+
+            // Handtraps & Simulation Flags
+            ashBlossomUsed: false,
+            showAshBlossomCutIn: false,
+            drollUsed: false,
+            drollActive: false,
+            showDrollCutIn: false,
+            infiniteImpermanenceUsed: false,
+            showInfiniteImpermanenceCutIn: false,
+            nibiruUsed: false,
+            summonCount: 0,
+            showNibiruCutIn: false,
+            zeusNegationUsed: false,
         });
     },
 
@@ -3202,7 +3284,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const newMaterials: { [key: string]: string[] } = {};
                     Object.keys(s.materials).forEach(hostId => {
                         const list = s.materials[hostId];
-                        if (list.includes(cId)) {
+                        // FIXED: Only remove from material lists if the card is NOT being moved as a material.
+                        // This prevents Xyz materials from being deleted immediately after they are attached.
+                        if (list.includes(cId) && toZone !== 'MATERIAL') {
                             newMaterials[hostId] = list.filter(m => m !== cId);
                         } else {
                             newMaterials[hostId] = list;
@@ -3641,11 +3725,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         logKey = 'log_ns';
                     } else if (isSpecialSummon) {
                         const variant = summonVariant?.toLowerCase();
-                        if (variant === 'fusion') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_fusion_summon_to_emz' : 'log_fusion_summon_to_mz';
-                        else if (variant?.startsWith('mats:')) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_fusion_summon_to_emz' : 'log_fusion_summon_to_mz';
-                        else if (variant === 'synchro') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_synchro_summon_to_emz' : 'log_synchro_summon_to_mz';
-                        else if (variant === 'xyz') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_xyz_summon_to_emz' : 'log_xyz_summon_to_mz';
-                        else if (variant === 'link') logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_link_summon_to_emz' : 'log_link_summon_to_mz';
+                        const sub = card.subType?.toUpperCase() || '';
+                        const isFusion = variant === 'fusion' || (variant?.startsWith('mats:') && sub.includes('FUSION'));
+                        const isSynchro = variant === 'synchro' || (variant?.startsWith('mats:') && sub.includes('SYNCHRO'));
+                        const isXyz = variant === 'xyz' || (variant?.startsWith('mats:') && sub.includes('XYZ'));
+                        const isLink = variant === 'link' || variant?.startsWith('link:') || (variant?.startsWith('mats:') && sub.includes('LINK'));
+
+                        if (isFusion) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_fusion_summon_to_emz' : 'log_fusion_summon_to_mz';
+                        else if (isSynchro) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_synchro_summon_to_emz' : 'log_synchro_summon_to_mz';
+                        else if (isXyz) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_xyz_summon_to_emz' : 'log_xyz_summon_to_mz';
+                        else if (isLink) logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_link_summon_to_emz' : 'log_link_summon_to_mz';
                         else logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_sp_summon_to_emz' : 'log_sp_summon_to_mz';
                     } else {
                         logKey = actualDestination === 'EXTRA_MONSTER_ZONE' ? 'log_move_to_emz' : 'log_move_to_mz';
@@ -3655,8 +3744,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const isPZone = toIndex === 0 || toIndex === 4;
                     if (isPendulum && isPZone) {
                         logKey = 'log_pendulum_setting';
-                    } else if (card.type === 'TRAP') {
-                        logKey = 'log_set_trap';
                     } else {
                         logKey = 'log_move_to_stz';
                     }
@@ -3688,18 +3775,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                 let combinedLog = formatLog(logKey, logParams);
 
-                // Consolidate Materials if provided (mats: or link: prefix)
                 if (summonVariant && !state.isReplaying) {
                     const materials = summonVariant.startsWith('link:') ? summonVariant.replace('link:', '') : (summonVariant.startsWith('mats:') ? summonVariant.replace('mats:', '') : null);
                     if (materials) {
                         const isJA = state.language === 'ja';
                         combinedLog += isJA ? `（${materials}）` : ` (${materials})`;
                     }
-                    if (summonVariant === 'FUSION' || summonVariant.startsWith('mats:')) {
+                    if (summonVariant === 'FUSION' || (summonVariant.startsWith('mats:') && card.subType?.toUpperCase().includes('FUSION') && card.cardId !== 'c029')) {
                         combinedLog = combinedLog.replace('を特殊召喚', 'を融合召喚');
-                    } else if (summonVariant === 'SYNCHRO') {
-                        combinedLog = combinedLog.replace('を特殊召喚', 'をシンクロ召喚');
-                    } else if (summonVariant.startsWith('link:')) {
+                    } else if (summonVariant === 'SYNCHRO' || (summonVariant.startsWith('mats:') && card.subType?.toUpperCase().includes('SYNCHRO'))) {
+                        combinedLog = combinedLog.replace('を特殊召喚', 'をS召喚');
+                    } else if (summonVariant === 'XYZ' || (summonVariant.startsWith('mats:') && card.subType?.toUpperCase().includes('XYZ'))) {
+                        combinedLog = combinedLog.replace('を特殊召喚', 'をX召喚');
+                    } else if (summonVariant === 'LINK' || (summonVariant && summonVariant.toLowerCase().startsWith('link:')) || (summonVariant.startsWith('mats:') && card.subType?.toUpperCase().includes('LINK'))) {
                         combinedLog = combinedLog.replace('を特殊召喚', 'をリンク召喚');
                     }
                 }
@@ -4290,19 +4378,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
             turnEffectUsage: {},
             cardFlags: {},
             triggerCandidates: [],
-            ashBlossomUsed: false,
-            infiniteImpermanenceUsed: false,
             pendulumSummonCount: 0,
             cardPropertyModifiers: {},
+            selectedDeckCardId: null,
+            history: [],
+            logs: [],
+            isEffectActivated: false,
+            currentStepIndex: -1,
+
+            // Handtraps & Simulation Flags
+            ashBlossomUsed: false,
             showAshBlossomCutIn: false,
             drollUsed: false,
             drollActive: false,
             showDrollCutIn: false,
-            selectedDeckCardId: null,
-            history: [],
-            logs: [],
-            isEffectActivated: false, // Initialize the flag
-            currentStepIndex: -1, // Reset currentStepIndex
+            infiniteImpermanenceUsed: false,
+            showInfiniteImpermanenceCutIn: false,
+            nibiruUsed: false,
+            summonCount: 0,
+            showNibiruCutIn: false,
+            zeusNegationUsed: false,
+
+            // UI & Logic States
+            modalQueue: [],
+            pendingChain: [],
+            pendingEffects: [],
+            isBatching: false,
+            isLinkSummoningActive: false,
+            isMaterialMove: false,
+            isTellBuffActive: false,
+            lastEffectSourceId: null,
+            searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },
+            effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null },
+            targetingState: { isOpen: false, filter: null, onSelect: null, mode: 'normal' },
+            zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
         });
     },
 
@@ -4615,7 +4724,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         // Validate
                         const isComputable = checkArkCrisisMaterials(materials.map(id => currentStore.cards[id]));
                         if (!isComputable) {
-                            store.addLog(formatLog('log_arc_crisis_req_fail'));
                             // Reset?
                             // materials.length = 0; 
                             // store.clearSelectedCards();
@@ -4641,7 +4749,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         return;
                     }
 
-                    store.addLog(formatLog('log_arc_crisis_select_material', { current: (materials.length + 1).toString(), requirements: formatLog('label_fusion_synchro_xyz_p') }));
                     store.startTargeting(
                         (c) => {
                             // Valid Scope: Monster Zones, EMZ, and Graveyard. NOT P-Zones.
@@ -4656,6 +4763,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                             // Don't select already selected
                             if (materials.includes(c.id)) return false;
+
+                            // DDD Name Check
+                            const hasDDD = c.name.includes('DDD') || (c.nameJa && c.nameJa.includes('DDD'));
+                            if (!hasDDD) return false;
 
                             // Safety: ensure it's a monster card
                             if (c.type !== 'MONSTER') return false;
@@ -4683,17 +4794,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         try {
             set({ isMaterialMove: true });
-            store.moveCard(tunerId, 'GRAVEYARD', 0, undefined, true);
+            get().moveCard(tunerId, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
             nonTunerIds.forEach(id => {
-                store.moveCard(id, 'GRAVEYARD', 0, undefined, true);
+                get().moveCard(id, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
             });
             set({ isMaterialMove: false });
 
-            const tunerName = getCardName(store.cards[tunerId], store.language);
-            const nonTunerNames = nonTunerIds.map(id => getCardName(store.cards[id], store.language)).join('＋');
+            const tunerName = getCardName(get().cards[tunerId], get().language);
+            const nonTunerNames = nonTunerIds.map(id => getCardName(get().cards[id], get().language)).join('＋');
 
             // Move Synchro Monster to Field
-            store.moveCard(synchroCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, `mats:${tunerName}＋${nonTunerNames}`);
+            get().moveCard(synchroCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, `mats:${tunerName}＋${nonTunerNames}`, false);
         } finally {
             set({ isHistoryBatching: false });
             get().pushHistory();
@@ -4701,125 +4812,65 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     resolveXyzSummon: (xyzCardId, materialIds, toZoneType, toZoneIndex) => {
+        const store = get();
+        const xyzCard = store.cards[xyzCardId];
+        const isXyzMonster = xyzCard.subType?.includes('XYZ') || xyzCardId === 'c018';
+        const isArkCrisis = xyzCard.cardId === 'c029';
+        const shouldAttach = isXyzMonster && !isArkCrisis;
+
         set({ isHistoryBatching: true });
         try {
-            // Fix: Perform ALL updates in a SINGLE set() call to avoid state sync issues
-            // This ensures:
-            // 1. Materials are removed from zones
-            // 2. Xyz monster is placed in the target zone
-            // 3. Materials map is updated
-            // All atomically, preventing race conditions or stale state references
-
+            // 1. Update Materials and Cleanup Modifiers
             set((state) => {
-                const xyzCard = state.cards[xyzCardId];
-                const isXyzMonster = xyzCard.subType?.includes('XYZ') || xyzCardId === 'c018'; // Machinex is Xyz-like
-                const isArkCrisis = xyzCard.cardId === 'c029';
-
-                // Determine if materials should be attached (Xyz) or sent to GY (Fusion/Synchro style)
-                const shouldAttach = isXyzMonster && !isArkCrisis;
-
                 const newMaterials = { ...state.materials };
+                const newCardPropertyModifiers = { ...state.cardPropertyModifiers };
                 let allMaterials: string[] = [];
-                let materialsToSendToGY: string[] = [];
 
                 materialIds.forEach(matId => {
-                    // Inherit existing materials (Transfer) if attached
-                    // If sending to GY, materials of materials also go to GY? 
-                    // Rule: If Xyz material is sent to GY, its materials go to GY.
-                    // We handle "top-level" materials here.
-
                     if (shouldAttach) {
                         allMaterials.push(matId);
                         if (newMaterials[matId]) {
                             allMaterials.push(...newMaterials[matId]);
                             delete newMaterials[matId];
                         }
-                    } else {
-                        // Send to GY
-                        materialsToSendToGY.push(matId);
-                        // If it had materials, they also go to GY (implicitly or explicitly?)
-                        // In Sim, "materials" map holds them. We should clear them.
-                        if (newMaterials[matId]) {
-                            materialsToSendToGY.push(...newMaterials[matId]);
-                            delete newMaterials[matId];
-                        }
                     }
-
-                    // Reset Property Modifiers (Level/ATK/DEF) since becoming material = leaving field
-                    // Modifiers don't persist on Xyz Materials.
-                });
-
-                // Create mutable copy of modifiers to update
-                const newCardPropertyModifiers = { ...state.cardPropertyModifiers };
-                materialIds.forEach(matId => {
                     if (newCardPropertyModifiers[matId]) {
                         delete newCardPropertyModifiers[matId];
                     }
                 });
 
-                // Update Materials Map (Attach)
                 if (shouldAttach) {
                     newMaterials[xyzCardId] = allMaterials;
                 }
 
-                // Create new zone arrays
-                let newMonsterZones = [...state.monsterZones];
-                let newExtraMonsterZones = [...state.extraMonsterZones];
-
-                // Clean materials from zones
-                materialIds.forEach(matId => {
-                    newMonsterZones = newMonsterZones.map(id => id === matId ? null : id);
-                    newExtraMonsterZones = newExtraMonsterZones.map(id => id === matId ? null : id);
-                });
-
-                // Also clean from P-Zones specifically if Arc Crisis (c029) used them (as per user request fix)
-                let newSpellTrapZones = [...state.spellTrapZones];
-                if (isArkCrisis) {
-                    materialIds.forEach(matId => {
-                        newSpellTrapZones = newSpellTrapZones.map(id => id === matId ? null : id);
-                    });
-                }
-
-                // Remove Xyz card from Extra Deck
                 const newExtraDeck = state.extraDeck.filter(id => id !== xyzCardId);
-
-                // Place Xyz monster in the target zone
-                if (toZoneType === 'MONSTER_ZONE' && typeof toZoneIndex === 'number' && toZoneIndex >= 0 && toZoneIndex < 5) {
-                    newMonsterZones[toZoneIndex] = xyzCardId;
-                } else if (toZoneType === 'EXTRA_MONSTER_ZONE' && typeof toZoneIndex === 'number' && (toZoneIndex === 0 || toZoneIndex === 1)) {
-                    newExtraMonsterZones[toZoneIndex] = xyzCardId;
-                }
-
-                // Update GY if materials were sent there
-                let newGraveyard = [...state.graveyard];
-                if (!shouldAttach && materialsToSendToGY.length > 0) {
-                    newGraveyard = [...newGraveyard, ...materialsToSendToGY];
-                }
-
-                // Log
-                let logs = [...state.logs];
-                const materialsLabel = materialIds.map(id => getCardName(state.cards[id], state.language)).join('＋');
-
-                if (shouldAttach) {
-                    const successLog = formatLog('log_xyz_summon_success', { card: getCardName(state.cards[xyzCardId], state.language) });
-                    logs = [`${successLog}（${materialsLabel}）`, ...logs];
-                } else {
-                    const successLog = formatLog('log_special_summon_success_gy', { card: getCardName(state.cards[xyzCardId], state.language) });
-                    logs = [`${successLog}（${materialsLabel}）`, ...logs];
-                }
 
                 return {
                     ...state,
-                    monsterZones: newMonsterZones,
-                    extraMonsterZones: newExtraMonsterZones,
-                    spellTrapZones: newSpellTrapZones,
                     extraDeck: newExtraDeck,
-                    graveyard: newGraveyard,
                     materials: newMaterials,
                     cardPropertyModifiers: newCardPropertyModifiers,
-                    logs
                 };
             });
+
+            // 2. Perform Movement via moveCard for Consistency and Logging
+            const materialNames = materialIds.map(id => getCardName(get().cards[id], get().language)).join('＋');
+
+            materialIds.forEach(matId => {
+                const s = get();
+                let fromLoc: any = undefined;
+                if (s.monsterZones.includes(matId)) fromLoc = 'MONSTER_ZONE';
+                else if (s.extraMonsterZones.includes(matId)) fromLoc = 'EXTRA_MONSTER_ZONE';
+                else if (s.spellTrapZones.includes(matId)) fromLoc = 'SPELL_TRAP_ZONE';
+                else if (s.graveyard.includes(matId)) fromLoc = 'GRAVEYARD';
+
+                const destination = isArkCrisis ? 'BANISHED' : (shouldAttach ? 'MATERIAL' : 'GRAVEYARD');
+                get().moveCard(matId, destination, 0, fromLoc, true, false, undefined, true);
+            });
+
+            const variant = `mats:${materialNames}`;
+            get().moveCard(xyzCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, variant, false);
+
         } finally {
             set({ isHistoryBatching: false });
             get().pushHistory();
@@ -5104,12 +5155,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
     },
 
-    changeLP: (amount, skipLog = false) => {
+    changeLP: (amount) => {
         get().pushHistory();
         set((state) => ({ lp: state.lp + amount }));
-        if (!skipLog) {
-            get().addLog(formatLog('log_take_damage', { amount: Math.abs(amount).toString() }));
-        }
     },
 
     setCardFlag: (cardId, flag) => set((state) => {
@@ -5478,6 +5526,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
 
             if (validIndices.length === 0) {
+                state.addLog(formatLog('log_no_valid_zones_for_card', { card: getCardName(card, state.language) }));
                 processNext(remainingIds.slice(1), placements);
                 return;
             }
@@ -5676,10 +5725,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Detect Pendulum Summon
             const p1 = sZones ? sZones[0] : null;
             const p4 = sZones ? sZones[4] : null;
-            const isP1Pendulum = p1 && snapshot.cards && snapshot.cards[p1]?.subType?.includes('PENDULUM');
-            const isP4Pendulum = p4 && snapshot.cards && snapshot.cards[p4]?.subType?.includes('PENDULUM');
-
-            if (sCount > prevPendulumSummonCount && isP1Pendulum && isP4Pendulum) {
+            if (sCount > prevPendulumSummonCount && p1 && p4) {
                 set({ showPendulumCutIn: true });
                 await new Promise(resolve => setTimeout(resolve, 1333));
                 set({ showPendulumCutIn: false });
@@ -5730,7 +5776,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== cardId) }));
             const cardDef = store.cards[cardId];
             if (cardDef && EFFECT_LOGIC[cardDef.cardId]) {
-                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019' && cardDef.cardId !== 'c008') {
+                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019') {
                     store.addLog(formatLog('log_trigger_activated', { card: getCardName(cardDef, store.language) }));
                 }
                 // Execute logic as 'TRIGGER'
@@ -5751,35 +5797,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const { history } = archive;
         if (!history || !Array.isArray(history) || history.length === 0) return;
 
-        // Restore missing static properties (description, etc.) removed during minification
-        const restoredHistory = history.map((state: any) => {
-            const restoredState = { ...state };
-            if (restoredState.cards) {
-                const restoredCards: Record<string, any> = {};
-                for (const [id, card] of Object.entries(restoredState.cards) as any) {
-                    const baseDef = CARD_DATABASE[card.cardId];
-                    if (baseDef) {
-                        restoredCards[id] = {
-                            ...baseDef,
-                            ...card // Instance overrides like state, location, ATK/DEF modifiers
-                        };
-                    } else {
-                        restoredCards[id] = card;
-                    }
-                }
-                restoredState.cards = restoredCards;
-            }
-            return restoredState;
-        });
-
         // Reset to final state of the replay per user request
-        const initialState = restoredHistory[restoredHistory.length - 1];
+        const initialState = history[history.length - 1];
         set({
             ...initialState,
-            history: restoredHistory,
+            history: history,
             // Ensure derived state / UI is clean
             isReplaying: false,
-            currentStepIndex: restoredHistory.length - 1,
+            currentStepIndex: history.length - 1,
             logs: archive.logs || initialState.logs || [],
 
             // Clean UI

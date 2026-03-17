@@ -56,24 +56,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             const tuners = monsters.filter(m => m.subType?.includes('TUNER'));
             const nonTuners = monsters.filter(m => !m.subType?.includes('TUNER'));
             const targetLevel = card.level || 0;
-
-            const nonTunerLevels = nonTuners.map(m => getLevel(m));
-
-            // Helper to find if any subset of nonTunerLevels sums to requiredLevel
-            const hasSubsetSum = (levels: number[], target: number): boolean => {
-                if (target === 0) return true; // Found a valid subset
-                if (target < 0 || levels.length === 0) return false;
-                // Try including the first element, or excluding it
-                return hasSubsetSum(levels.slice(1), target - levels[0]) ||
-                    hasSubsetSum(levels.slice(1), target);
-            };
-
-            return tuners.some(t => {
-                // Must have at least 1 non-tuner
-                if (nonTunerLevels.length === 0) return false;
-                const requiredFromNonTuners = targetLevel - getLevel(t);
-                return requiredFromNonTuners > 0 && hasSubsetSum(nonTunerLevels, requiredFromNonTuners);
-            });
+            return tuners.some(t => nonTuners.some(nt => (getLevel(t) + getLevel(nt)) === targetLevel));
         }
 
         // 3. Xyz
@@ -137,6 +120,8 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             const requirements = ['FUSION', 'SYNCHRO', 'XYZ', 'PENDULUM'];
             const canSatisfy = (c: CardType, req: string): boolean => {
                 const sub = (c.subType || '').toUpperCase();
+                const hasDD = c.name.includes('DD') || (c.nameJa && c.nameJa.includes('DD'));
+                if (!hasDD) return false;
                 if (req === 'FUSION') return sub.includes('FUSION');
                 if (req === 'SYNCHRO') return sub.includes('SYNCHRO');
                 if (req === 'XYZ') return sub.includes('XYZ') || c.cardId === 'c018';
@@ -397,9 +382,8 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
     // Arc Crisis Summon Logic
     const startArcCrisisSummon = (arcCrisisId: string) => {
         const store = useGameStore.getState();
-        // store.addLog(formatLog('log_arc_crisis_init'));
 
-        // Collect candidates from field (Monsters) and graveyard
+        // Collect candidates from field (Monsters + P-Zones) and graveyard
         const fieldMonsterIds = [...store.monsterZones, ...store.extraMonsterZones].filter((id): id is string => id !== null);
         const gyMonsterIds = store.graveyard.filter(id => store.cards[id]?.type === 'MONSTER');
         const allCandidates = [...fieldMonsterIds, ...gyMonsterIds];
@@ -435,18 +419,17 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 return r;
             }).join('/');
 
-            // currentStore.addLog(formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: reqLabels }));
 
             // Filter valid candidates
             const validCandidates = allCandidates.filter(id => {
                 if (selectedMaterials.includes(id)) return false;
                 const card = currentStore.cards[id];
+                const hasDD = card.name.includes('DD') || (card.nameJa && card.nameJa.includes('DD'));
+                if (!hasDD) return false;
                 return remainingReqs.some(req => canSatisfyReq(card, req));
             });
 
             if (validCandidates.length === 0) {
-                currentStore.addLog(formatLog('log_arc_crisis_fail'));
-                currentStore.clearSelectedCards();
                 return;
             }
 
@@ -484,7 +467,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             currentStore.startSearch(
                 (c) => validCandidates.includes(c.id),
                 (sid) => selectMaterialById(sid),
-                formatLog('log_arc_crisis_select_material', { current: (selectedMaterials.length + 1).toString(), requirements: (selectedMaterials.length + 1).toString() }), // Re-using existing if feasible or generalize
+                formatLog('prompt_select_card'),
                 [...allFieldIds, ...currentStore.graveyard]
             );
         };
@@ -574,17 +557,16 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
                 // Banish all materials
                 materialIds.forEach(id => {
-                    finalStore.moveCard(id, 'BANISHED', 0, undefined, true);
-                    // finalStore.addLog(formatLog('log_banished', { card: getCardName(finalStore.cards[id], finalStore.language) }));
+                    finalStore.moveCard(id, 'BANISHED', 0, undefined, true, false, undefined, true);
                 });
 
                 // Reset material move flag
                 useGameStore.setState({ isMaterialMove: false });
 
                 // Summon Arc Crisis
-                const materialsLabel = materialIds.map(id => getCardName(finalStore.cards[id], finalStore.language)).join('&');
-                finalStore.moveCard(arcCrisisId, type, index, undefined, true, true, undefined, true);
-                finalStore.addLog(formatLog('log_arc_crisis_success_with_mats', { materials: materialsLabel }));
+                const materialNames = materialIds.map(id => getCardName(store.cards[id], store.language)).join('＋');
+                finalStore.moveCard(arcCrisisId, type, index, undefined, false, true, `mats:${materialNames}`);
+
 
                 finalStore.clearSelectedCards();
 
@@ -633,35 +615,39 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         }
 
         store.startEffectSelection(
-            formatLog('prompt_activate_effect', { name: 'Alfred' }),
+            formatLog('prompt_activate_effect', { name: getCardName(store.cards[alfredId], store.language) }),
             [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
             (choice) => {
                 if (choice === 'yes') {
-                    const placedCount = { count: 0 };
+                    const selectedIds: string[] = [];
                     const placeNextContract = () => {
-                        if (placedCount.count >= dddCount) {
+                        if (selectedIds.length >= dddCount) {
+                            finishAlfredEffect(selectedIds);
                             return;
                         }
 
                         const s = useGameStore.getState();
                         const remaining = [...s.graveyard, ...s.banished].filter(id => {
+                            if (selectedIds.includes(id)) return false;
                             const card = s.cards[id];
                             return (card.name.includes('Dark Contract') || card.name.includes('契約書')) &&
                                 (card.subType?.includes('CONTINUOUS') || card.type === 'TRAP');
                         });
 
                         if (remaining.length === 0) {
+                            finishAlfredEffect(selectedIds);
                             return;
                         }
 
                         s.startEffectSelection(
                             formatLog('prompt_select_card'),
                             [
-                                ...remaining.map(id => ({ label: s.cards[id].name, value: id, imageUrl: s.cards[id].imageUrl })),
+                                ...remaining.map(id => ({ label: getCardName(s.cards[id], s.language), value: id, imageUrl: s.cards[id].imageUrl })),
                                 { label: formatLog('ui_done'), value: 'done' }
                             ],
                             (selected) => {
                                 if (selected === 'done') {
+                                    finishAlfredEffect(selectedIds);
                                     return;
                                 }
 
@@ -670,16 +656,25 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                                 const emptySTIdx = s2.spellTrapZones.findIndex((v, i) => v === null && i !== 0 && i !== 4);
 
                                 if (emptySTIdx !== -1) {
-                                    s2.moveCard(selected, 'SPELL_TRAP_ZONE', emptySTIdx, undefined, false, false, undefined, true);
-                                    s2.addLog(formatLog('log_alfred_placed_card', { card: getCardName(s2.cards[selected], s2.language) }));
-                                    placedCount.count++;
+                                    s2.moveCard(selected, 'SPELL_TRAP_ZONE', emptySTIdx, undefined, true, false, undefined, true);
+                                    selectedIds.push(selected);
                                     placeNextContract();
                                 } else {
                                     s2.addLog(formatLog('log_alfred_no_zone'));
+                                    finishAlfredEffect(selectedIds);
                                 }
                             }
                         );
                     };
+
+                    const finishAlfredEffect = (ids: string[]) => {
+                        if (ids.length > 0) {
+                            const currentStore = useGameStore.getState();
+                            const names = ids.map(id => getCardName(currentStore.cards[id], currentStore.language)).join('&');
+                            currentStore.addLog(formatLog('log_alfred_placed_multiple', { cards: names }));
+                        }
+                    };
+
                     placeNextContract();
                 }
             }
