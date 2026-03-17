@@ -3343,7 +3343,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (['MONSTER_ZONE', 'SPELL_TRAP_ZONE', 'FIELD_ZONE', 'EXTRA_MONSTER_ZONE'].includes(fromLocation) &&
                     !['MONSTER_ZONE', 'SPELL_TRAP_ZONE', 'FIELD_ZONE', 'EXTRA_MONSTER_ZONE'].includes(toZone)) {
                     // Fix: Check state.cardFlags explicitly (transient flags)
-                    if (state.cardFlags[cardId]?.includes('BANISH_ON_LEAVE')) {
+                    // Added: toZone !== 'MATERIAL' to prevent banishment when used as Xyz Material
+                    if (state.cardFlags[cardId]?.includes('BANISH_ON_LEAVE') && toZone !== 'MATERIAL') {
                         toZone = 'BANISHED';
                     }
                 }
