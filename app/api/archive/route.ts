@@ -32,7 +32,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { nickname, initialSetup, explanation, history, logs, image, authorId } = body;
+        const { nickname, initialSetup, explanation, compressedHistory, history, logs, image, authorId } = body;
 
         const id = Date.now().toString();
         const createdAt = new Date().toISOString();
@@ -48,7 +48,9 @@ export async function POST(request: Request) {
             nickname: nickname || 'Anonymous',
             initial_setup: initialSetup || '',
             explanation: explanation || '',
-            history: history || [],
+            // 新形式: compressedHistory を使用。古い形式 (history) はフォールバック用に残す
+            compressed_history: compressedHistory || null,
+            history: compressedHistory ? [] : (history || []), // 新形式は history を空にして容量節約
             logs: logs || [],
             image_path: imagePath,
             created_at: createdAt,

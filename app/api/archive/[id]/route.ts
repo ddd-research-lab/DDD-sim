@@ -25,7 +25,9 @@ export async function GET(
             createdAt: archive.created_at,
             authorId: archive.author_id,
             likedBy: archive.liked_by,
-            imagePath: archive.image_path
+            imagePath: archive.image_path,
+            // 新形式の圧縮 history（存在しない場合は null）
+            compressedHistory: archive.compressed_history || null,
         };
 
         return NextResponse.json(archiveCamel);
