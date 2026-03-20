@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { compressHistory } from '@/lib/historyCompression';
 import { formatLog, getCardName } from '@/data/locales';
 import html2canvas from 'html2canvas'; // Allow import from html2canvas
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -54,29 +55,26 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             // Join non-empty IDs with commas
             const initialSetupString = initialSetupIds.filter(id => id !== '').join(',');
 
-            // Compress history data to reduce payload size
-            const minifiedHistory = history.map(state => {
-                const minifiedState = { ...state };
-                // Strip logs from every snapshot as it's redundant (top-level logs are used with logCount)
-                delete minifiedState.logs;
-                
-                if (minifiedState.cards) {
-                    const minifiedCards: Record<string, any> = {};
-                    for (const [id, card] of Object.entries(minifiedState.cards)) {
-                        const { description, pendulumEffect, name, nameJa, image, ...essentialCardData } = card as any;
-                        minifiedCards[id] = essentialCardData;
-                    }
-                    minifiedState.cards = minifiedCards;
+            // 高度な圧縮を利用してペイロードを削減
+            const compressedResult = compressHistory(history);
+            
+            // 圧縮後のスナップショット内のカードデータも最小化する（追加の最適化）
+            if (compressedResult.cards) {
+                const minifiedCards: Record<string, any> = {};
+                for (const [id, card] of Object.entries(compressedResult.cards)) {
+                    const { description, pendulumEffect, name, nameJa, image, ...essentialCardData } = card as any;
+                    minifiedCards[id] = essentialCardData;
                 }
-                return minifiedState;
-            });
+                compressedResult.cards = minifiedCards;
+            }
 
             const payload = {
                 nickname,
                 initialSetup: initialSetupString,
                 explanation,
-                history: minifiedHistory,
-                logs, // Include full logs once at top level
+                compressedHistory: compressedResult,
+                history: [], // 旧形式は空にして容量を節約
+                logs, // ログ本体はトップレベルに1つだけ含める
                 image: imageBase64,
                 authorId: getUserId()
             };

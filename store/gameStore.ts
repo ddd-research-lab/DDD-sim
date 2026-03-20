@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { GameState, Card, ZoneType } from '@/types';
+import { decompressHistory, isCompressedHistory } from '@/lib/historyCompression';
 import { formatLog, getCardName } from '@/data/locales';
 import { CARD_DATABASE } from '@/data/cards';
 
@@ -5795,7 +5796,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     loadArchive: (archive: any) => {
-        const { history } = archive;
+        let history = archive.history;
+
+        // 解凍処理: compressedHistory が存在し、かつ history が空または無効な場合に解凍を行う
+        if (isCompressedHistory(archive.compressedHistory)) {
+            history = decompressHistory(archive.compressedHistory);
+        }
+
         if (!history || !Array.isArray(history) || history.length === 0) return;
 
         // Reset to final state of the replay per user request
