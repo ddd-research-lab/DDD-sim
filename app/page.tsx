@@ -31,7 +31,7 @@ import { SimToggles } from '@/components/SimToggles';
 function ReplayLoader() {
   const searchParams = useSearchParams();
   const replayId = searchParams.get('replayId');
-  const { loadArchive } = useGameStore();
+  const loadArchive = useGameStore(state => state.loadArchive);
 
   useEffect(() => {
     if (replayId) {
@@ -50,8 +50,8 @@ function ReplayLoader() {
 }
 
 export default function Home() {
+  const initializeGame = useGameStore(state => state.initializeGame);
   const {
-    initializeGame,
     moveCard,
     deck,
     setDeck,
@@ -88,7 +88,7 @@ export default function Home() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [analytics, setAnalytics] = useState<{ total: number; daily: number } | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
-  const [useAbbreviation, setUseAbbreviation] = useState(false);
+  const [useAbbreviation, setUseAbbreviation] = useState(true);
 
   const CARD_ABBREVIATIONS: Record<string, string> = {
     'DD魔導賢者ケプラー': 'ケプラー',

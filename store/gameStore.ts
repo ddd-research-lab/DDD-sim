@@ -2707,7 +2707,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
 
-    logOrder: 'newest',
+    logOrder: 'oldest',
     toggleLogOrder: () => set((state) => ({ logOrder: state.logOrder === 'newest' ? 'oldest' : 'newest' })),
     showZoneInLog: false,
     toggleShowZoneInLog: () => set((state) => ({ showZoneInLog: !state.showZoneInLog })),
