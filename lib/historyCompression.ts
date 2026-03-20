@@ -8,6 +8,17 @@ const UI_ONLY_FIELDS: (keyof GameState)[] = [
     'isPendulumProcessing',
     'isReplaying',
     'history',           // 入れ子の history は不要
+    'logs',              // スナップショット内の logs は logCount で代用可能
+    'isEffectActivated',
+    'showAshBlossomCutIn',
+    'showDrollCutIn',
+    'showInfiniteImpermanenceCutIn',
+    'showNibiruCutIn',
+    'activeEffectCardId',
+    'isLinkSummoningActive',
+    'isMaterialMove',
+    'isTellBuffActive',
+    'isHistoryBatching',
 ];
 
 export interface CompressedHistory {

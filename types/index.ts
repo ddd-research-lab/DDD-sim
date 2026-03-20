@@ -90,6 +90,13 @@ export interface GameState {
     zeusNegationUsed: boolean;
     showZoneInLog: boolean;
     logCount?: number; // Optional count of logs for optimized history snapshots
+    isEffectActivated: boolean;
+    modalQueue: Array<() => void>;
+    pendingChain: Array<{ id: string, label: string, execute: () => void }>;
+    pendingEffects: Array<() => void>;
+    isBatching: boolean;
+    isHistoryBatching: boolean;
+    jumpHistory: Partial<GameState>[];
 }
 
 export interface DragItem {

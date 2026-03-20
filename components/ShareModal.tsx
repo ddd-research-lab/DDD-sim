@@ -57,6 +57,9 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             // Compress history data to reduce payload size
             const minifiedHistory = history.map(state => {
                 const minifiedState = { ...state };
+                // Strip logs from every snapshot as it's redundant (top-level logs are used with logCount)
+                delete minifiedState.logs;
+                
                 if (minifiedState.cards) {
                     const minifiedCards: Record<string, any> = {};
                     for (const [id, card] of Object.entries(minifiedState.cards)) {
