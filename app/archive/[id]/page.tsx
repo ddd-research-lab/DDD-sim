@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatLog, getCardName } from '@/data/locales';
 import { getUserId } from '@/lib/userId';
 import { CARD_DATABASE } from '@/data/cards';
+import { EditArchiveModal } from '@/components/EditArchiveModal';
 
 interface ArchiveDetail {
     id: string;
@@ -90,6 +91,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
     const [archive, setArchive] = useState<ArchiveDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [useAbbreviation, setUseAbbreviation] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const router = useRouter();
 
     // Helper to resolve card IDs to localized names
@@ -143,6 +145,39 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
             setArchive({ ...archive, likes: data.likes, likedBy: [...(archive.likedBy || []), userId] });
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleEditSave = async (data: { initialSetup: string; explanation: string; nickname: string }) => {
+        if (!archive) return;
+        try {
+            const res = await fetch(`/api/archive/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    authorId: getUserId(),
+                    initialSetup: data.initialSetup,
+                    explanation: data.explanation,
+                    nickname: data.nickname
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Update failed');
+            }
+
+            // Update local state
+            setArchive({
+                ...archive,
+                initialSetup: data.initialSetup,
+                explanation: data.explanation,
+                nickname: data.nickname
+            });
+            alert('更新しました');
+        } catch (err: any) {
+            console.error(err);
+            alert(`更新に失敗しました: ${err.message}`);
         }
     };
 
@@ -376,23 +411,50 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 {isAuthor && (
-                    <button
-                        onClick={handleDelete}
-                        style={{
-                            padding: '10px',
-                            fontSize: '14px',
-                            background: 'transparent',
-                            color: '#d32f2f',
-                            border: '1px solid #d32f2f',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            marginTop: '10px'
-                        }}
-                    >
-                        {formatLog('ui_delete_archive')}
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <button
+                            onClick={() => setIsEditModalOpen(true)}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                fontSize: '14px',
+                                background: '#4CAF50',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            編集
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                fontSize: '14px',
+                                background: 'transparent',
+                                color: '#d32f2f',
+                                border: '1px solid #d32f2f',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {formatLog('ui_delete_archive')}
+                        </button>
+                    </div>
                 )}
             </div>
+
+            <EditArchiveModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                initialSetup={archive.initialSetup}
+                explanation={archive.explanation}
+                nickname={archive.nickname}
+                onSave={handleEditSave}
+                language="ja"
+            />
         </div>
     );
 }

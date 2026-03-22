@@ -25,7 +25,9 @@ export async function GET(
             createdAt: archive.created_at,
             authorId: archive.author_id,
             likedBy: archive.liked_by,
-            imagePath: archive.image_path
+            imagePath: archive.image_path,
+            // 新形式の圧縮 history（存在しない場合は null）
+            compressedHistory: archive.compressed_history || null,
         };
 
         return NextResponse.json(archiveCamel);
@@ -83,40 +85,72 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const { userId } = await request.json();
+        const body = await request.json();
+        const { userId, initialSetup, explanation, nickname, authorId } = body;
 
-        // Use a transaction-like update or RPC to handle likes to avoid race conditions
-        // For simplicity:
-        const { data: archive, error: fetchError } = await supabase
-            .from('archives')
-            .select('liked_by, likes')
-            .eq('id', id)
-            .single();
+        // Determine if this is an update or a like action
+        if (initialSetup !== undefined || explanation !== undefined) {
+            // Update action: Verify authorId
+            const { data: archive, error: fetchError } = await supabase
+                .from('archives')
+                .select('author_id')
+                .eq('id', id)
+                .single();
 
-        if (fetchError || !archive) {
-            return NextResponse.json({ error: 'Archive not found' }, { status: 404 });
+            if (fetchError || !archive) {
+                return NextResponse.json({ error: 'Archive not found' }, { status: 404 });
+            }
+
+            if (archive.author_id && archive.author_id !== authorId) {
+                return NextResponse.json({ error: 'Unauthorized: Only the author can edit this' }, { status: 403 });
+            }
+
+            const updateData: any = {};
+            if (initialSetup !== undefined) updateData.initial_setup = initialSetup;
+            if (explanation !== undefined) updateData.explanation = explanation;
+            if (nickname !== undefined) updateData.nickname = nickname;
+
+            const { error: updateError } = await supabase
+                .from('archives')
+                .update(updateData)
+                .eq('id', id);
+
+            if (updateError) throw updateError;
+
+            return NextResponse.json({ success: true });
+        } else {
+            // Like action: existing logic
+            const { data: archive, error: fetchError } = await supabase
+                .from('archives')
+                .select('liked_by, likes')
+                .eq('id', id)
+                .single();
+
+            if (fetchError || !archive) {
+                return NextResponse.json({ error: 'Archive not found' }, { status: 404 });
+            }
+
+            const likedBy = archive.liked_by || [];
+            if (likedBy.includes(userId)) {
+                return NextResponse.json({ error: 'Already liked' }, { status: 400 });
+            }
+
+            const { data: updated, error: updateError } = await supabase
+                .from('archives')
+                .update({
+                    liked_by: [...likedBy, userId],
+                    likes: (archive.likes || 0) + 1
+                })
+                .eq('id', id)
+                .select('likes')
+                .single();
+
+            if (updateError) throw updateError;
+
+            return NextResponse.json({ success: true, likes: updated.likes });
         }
-
-        const likedBy = archive.liked_by || [];
-        if (likedBy.includes(userId)) {
-            return NextResponse.json({ error: 'Already liked' }, { status: 400 });
-        }
-
-        const { data: updated, error: updateError } = await supabase
-            .from('archives')
-            .update({
-                liked_by: [...likedBy, userId],
-                likes: (archive.likes || 0) + 1
-            })
-            .eq('id', id)
-            .select('likes')
-            .single();
-
-        if (updateError) throw updateError;
-
-        return NextResponse.json({ success: true, likes: updated.likes });
-    } catch (error) {
-        console.error('Error liking archive:', error);
-        return NextResponse.json({ error: 'Failed to like archive' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Error in PATCH archive:', error);
+        return NextResponse.json({ error: 'Failed to process patch request', details: error.message }, { status: 500 });
     }
 }

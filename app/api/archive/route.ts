@@ -5,7 +5,7 @@ export async function GET() {
     try {
         const { data: archives, error } = await supabase
             .from('archives')
-            .select('id, nickname, initial_setup, explanation, created_at, image_path, likes, liked_by')
+            .select('id, nickname, initial_setup, explanation, created_at, image_path, likes, liked_by, author_id')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -19,7 +19,8 @@ export async function GET() {
             createdAt: a.created_at,
             imagePath: a.image_path,
             likes: a.likes || 0,
-            likedBy: a.liked_by || []
+            likedBy: a.liked_by || [],
+            authorId: a.author_id
         }));
 
         return NextResponse.json(summary);
@@ -32,7 +33,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { nickname, initialSetup, explanation, history, logs, image, authorId } = body;
+        const { nickname, initialSetup, explanation, compressedHistory, history, logs, image, authorId } = body;
 
         const id = Date.now().toString();
         const createdAt = new Date().toISOString();
@@ -48,7 +49,9 @@ export async function POST(request: Request) {
             nickname: nickname || 'Anonymous',
             initial_setup: initialSetup || '',
             explanation: explanation || '',
-            history: history || [],
+            // 新形式: compressedHistory を使用。古い形式 (history) はフォールバック用に残す
+            compressed_history: compressedHistory || null,
+            history: compressedHistory ? [] : (history || []), // 新形式は history を空にして容量節約
             logs: logs || [],
             image_path: imagePath,
             created_at: createdAt,

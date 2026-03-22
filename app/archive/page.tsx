@@ -15,6 +15,7 @@ interface Archive {
     imagePath?: string;
     likes: number;
     likedBy?: string[];
+    authorId?: string;
 }
 
 export default function ArchiveListPage() {
@@ -58,6 +59,32 @@ export default function ArchiveListPage() {
             window.removeEventListener('blur', handleBlur);
         };
     }, []);
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const confirmed = window.confirm('このルートを削除しますか？');
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/api/archive/${id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ authorId: getUserId() }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(`削除に失敗しました: ${err.error || '不明なエラー'}`);
+                return;
+            }
+            // 一覧から即時除去
+            setArchives(prev => prev.filter(a => a.id !== id));
+        } catch (err) {
+            console.error(err);
+            alert('削除に失敗しました。');
+        }
+    };
 
     const handleAdminDelete = async (e: React.MouseEvent, id: string, bypassPrompt = false) => {
         e.preventDefault();
@@ -253,6 +280,28 @@ export default function ArchiveListPage() {
                                                 top: '5px',
                                                 right: '5px',
                                                 background: 'rgba(255,64,129,0.9)',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '4px 8px',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                zIndex: 20,
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                                            }}
+                                        >
+                                            削除
+                                        </button>
+                                    )}
+                                    {archive.authorId === userId && (
+                                        <button
+                                            onClick={(e) => handleDelete(e, archive.id)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '5px',
+                                                right: '5px',
+                                                background: 'rgba(211,47,47,0.9)',
                                                 color: '#fff',
                                                 border: 'none',
                                                 borderRadius: '4px',
