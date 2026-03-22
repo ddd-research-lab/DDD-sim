@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Zone } from './Zone';
 import { useGameStore } from '@/store/gameStore';
 import { Card } from './Card';
@@ -7,6 +8,7 @@ import { PendulumSummonModal } from './PendulumSummonModal';
 import { formatLog } from '@/data/locales';
 
 export function Board() {
+    const router = useRouter();
     const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers } = useGameStore();
     const isTargeting = targetingState.isOpen;
     const isSelectingZone = zoneSelectionState.isOpen;
@@ -94,7 +96,10 @@ export function Board() {
                 </button>
 
                 <button
-                    onClick={resetGame}
+                    onClick={() => {
+                        resetGame();
+                        router.replace('/');
+                    }}
                     style={{
                         padding: '6px 12px',
                         fontSize: '12px',
