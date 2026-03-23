@@ -6,7 +6,8 @@ export function SimToggles() {
         ashBlossomSimulationEnabled, setAshBlossomSimulationEnabled,
         drollSimulationEnabled, setDrollSimulationEnabled,
         infiniteImpermanenceSimulationEnabled, setInfiniteImpermanenceSimulationEnabled,
-        nibiruSimulationEnabled, setNibiruSimulationEnabled
+        nibiruSimulationEnabled, setNibiruSimulationEnabled,
+        impulseSimulationEnabled, setImpulseSimulationEnabled
     } = useGameStore();
 
     const buttonStyle = (active: boolean, activeColor: string, hoverColor: string) => ({
@@ -28,6 +29,7 @@ export function SimToggles() {
     return (
         <div style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '10px',
             justifyContent: 'center',
             padding: '5px 0',
@@ -60,6 +62,15 @@ export function SimToggles() {
                 title={infiniteImpermanenceSimulationEnabled ? '無限泡影割り込みあり' : '無限泡影割り込みなし'}
             >
                 {infiniteImpermanenceSimulationEnabled ? '泡影 ON' : '泡影 OFF'}
+            </button>
+
+            {/* Impulse Simulation Toggle */}
+            <button
+                onClick={() => setImpulseSimulationEnabled(!impulseSimulationEnabled)}
+                style={buttonStyle(impulseSimulationEnabled, '#e1bee7', '#ce93d8')}
+                title={impulseSimulationEnabled ? '霊王の波動割り込みあり' : '霊王の波動割り込みなし'}
+            >
+                {impulseSimulationEnabled ? 'インパルス ON' : 'インパルス OFF'}
             </button>
 
             {/* Nibiru Simulation Toggle */}

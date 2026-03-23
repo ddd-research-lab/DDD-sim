@@ -362,7 +362,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 });
 
                 if (hasTarget && !store.turnEffectUsage[usageKey]) {
-                    store.startEffectSelection(formatLog('prompt_ragnarok_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+                    store.startEffectSelection(formatLog('prompt_ragnarok_gy_ss', { card: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                        if (choice === 'yes' && isNegated) { store.addTurnEffectUsage(usageKey); return; }
+                        if (isNegated) return;
                         // Cleanup triggers
                         useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
 
@@ -403,7 +405,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
             const hasTarget = store.graveyard.some((id: string) => isDDArchetype(store.cards[id]) && store.cards[id].type === 'MONSTER');
             if (hasTarget) {
-                store.startEffectSelection(formatLog('prompt_ragnarok_p_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+                store.startEffectSelection(formatLog('prompt_ragnarok_p_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage(usageKey); return; }
+                    if (isNegated) return;
                     // Cleanup pending trigger
                     useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== selfId) }));
 
@@ -473,7 +477,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
         // [Hand Effect]
         if (inHand && !inMZ && !fromLocation && !store.isHistoryBatching && summonVariant !== 'PENDULUM' && !store.isBatching && !store.isPendulumSummoning && !store.isPendulumProcessing) {
             if (!store.turnEffectUsage['c012_hand_ss']) {
-                store.startEffectSelection(formatLog('prompt_count_surveyor_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+                store.startEffectSelection(formatLog('prompt_count_surveyor_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c012_hand_ss', selfId); return; }
+                    if (isNegated) return;
                     if (choice === 'yes') {
                         const currentStore = useGameStore.getState();
                         const handDD = currentStore.hand.filter(id => id !== selfId && isDDArchetype(currentStore.cards[id]));
@@ -592,7 +598,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
 
             if (!hasDD) return;
 
-            store.startEffectSelection(formatLog('prompt_gryphon_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+            store.startEffectSelection(formatLog('prompt_gryphon_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c013_hand_ss', selfId); return; }
+                if (isNegated) return;
                 if (choice === 'yes') {
                     const emptyIndices = store.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
                     if (emptyIndices.length > 0) {
@@ -851,7 +859,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
         const inMZ = store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId);
 
         if (inHand && !inMZ && fromLocation === 'TRIGGER' && summonVariant !== 'PENDULUM' && !store.isBatching && !store.isPendulumSummoning && !store.isPendulumProcessing) {
-            store.startEffectSelection(formatLog('prompt_orthros_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+            store.startEffectSelection(formatLog('prompt_orthros_hand_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                if (isNegated) return;
                 if (choice === 'yes') {
                     // SS from Hand
                     // Check empty zones
@@ -894,7 +903,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 return;
             }
 
-            store.startEffectSelection(formatLog('prompt_scale_surveyor_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+            store.startEffectSelection(formatLog('prompt_scale_surveyor_ss'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c014_hand_ss'); return; }
+                if (isNegated) return;
                 if (choice === 'yes') {
                     const emptyIndices = store.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
                     if (emptyIndices.length > 0) {
@@ -1019,8 +1030,10 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             const hasOtherDD = currentStore.graveyard.some((id: string) => id !== selfId && isDDArchetype(currentStore.cards[id]));
             if (!hasOtherDD) return;
 
-            store.startEffectSelection(formatLog('prompt_necro_slime_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+            store.startEffectSelection(formatLog('prompt_necro_slime_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
                 const s = useGameStore.getState();
+                if (choice === 'yes' && isNegated) { s.addTurnEffectUsage('c015_effect', selfId); return; }
+                if (isNegated) return;
                 if (choice === 'yes') {
                     // Check usage again inside callback to be safe
                     if (s.turnEffectUsage['c015_effect']) return;
@@ -1191,7 +1204,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 return;
             }
 
-            store.startEffectSelection(formatLog('prompt_swamp_king_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
+            store.startEffectSelection(formatLog('prompt_swamp_king_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+                if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c006'); return; }
+                if (isNegated) return;
                 if (choice === 'yes') {
                     store.startEffectSelection(formatLog('label_fusion_monster_select'), fusionOptions, (fusionId: string) => {
                         const fusionCard = store.cards[fusionId];
@@ -1520,7 +1535,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             store.startEffectSelection(
                 formatLog('prompt_clovis_ss'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
-                (choice: string) => {
+                (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c026'); return; }
+                    if (isNegated) return;
                     if (choice === 'yes') {
                         store.startSearch(
                             (card: any) => candidates.includes(card.id),
@@ -1559,6 +1576,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                 formatLog('prompt_alfred_fusion'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                 (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c027'); return; }
                     if (isNegated) return;
                     if (choice === 'yes') {
                         // Select Fusion Monster
@@ -2209,9 +2227,11 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             }
 
             store.startEffectSelection(
-                formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }),
+                formatLog('prompt_zero_king_contract'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                 (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c034'); return; }
+                    if (isNegated) return;
                     if (choice === 'yes') {
                         // Handle activating from hand
                         if (inHand) {
@@ -2306,7 +2326,9 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
             startEffectSelection(
                 formatLog('prompt_zero_machinex_ss'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
-                (choice: string) => {
+                (choice: string, isNegated?: boolean) => {
+                    if (choice === 'yes' && isNegated) { useGameStore.getState().addTurnEffectUsage(usageKey); return; }
+                    if (isNegated) return;
                     if (choice === 'yes') {
                         useGameStore.getState().addTurnEffectUsage(usageKey);
                         startZoneSelection(
@@ -2539,6 +2561,7 @@ interface GameStore extends GameState {
     showInfiniteImpermanenceCutIn: boolean;
     activateNibiru: () => void;
     setNibiruSimulationEnabled: (enabled: boolean) => void;
+    setImpulseSimulationEnabled: (enabled: boolean) => void;
     resetSummonCount: () => void;
     zeusNegationUsed: boolean;
 }
@@ -2578,6 +2601,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     infiniteImpermanenceUsed: false,
     infiniteImpermanenceSimulationEnabled: false,
     showInfiniteImpermanenceCutIn: false,
+    impulseSimulationEnabled: false,
+    impulseUsed: false,
+    showImpulseCutIn: false,
     zeusNegationUsed: false,
 
     // Setters
@@ -2589,6 +2615,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setInfiniteImpermanenceSimulationEnabled: (enabled) => set({ infiniteImpermanenceSimulationEnabled: enabled }),
     resetSummonCount: () => set({ summonCount: 0 }),
     setNibiruSimulationEnabled: (enabled: boolean) => set({ nibiruSimulationEnabled: enabled }),
+    setImpulseSimulationEnabled: (enabled: boolean) => set({ impulseSimulationEnabled: enabled }),
     setSelectedDeckCardId: (id) => set({ selectedDeckCardId: id }),
     selectedDeckCardId: null,
 
@@ -2969,6 +2996,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             summonCount: 0,
             showNibiruCutIn: false,
             zeusNegationUsed: false,
+            impulseUsed: false,
+            showImpulseCutIn: false,
         });
     },
 
@@ -4400,6 +4429,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             summonCount: 0,
             showNibiruCutIn: false,
             zeusNegationUsed: false,
+            impulseUsed: false,
+            showImpulseCutIn: false,
 
             // UI & Logic States
             modalQueue: [],
@@ -4942,6 +4973,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
             }
 
+            // Impulse Logic
+            if (activatorId && state.impulseSimulationEnabled && !state.impulseUsed) {
+                const activatorCard = state.cards[activatorId];
+                if (activatorCard) {
+                    const impulseNames = ['スケール', 'アビス', 'グリフォン', 'オルトロス', 'カウント', 'ネクロ', '魔神王', '零王', 'ワンフォ', 'テムジン', '大王テムジン', 'アルフレッド', 'クロヴィス', 'ゼロ・マキナ'];
+                    const nameJa = activatorCard.nameJa || '';
+                    const name = activatorCard.name || '';
+                    
+                    // Check if the effect prompt indicates a Special Summon or Fusion
+                    const isSpecialSummonEffect = title.includes('特殊召喚') || title.includes('融合') || title.includes('蘇生') || title.includes('P召喚') || title.includes('ペンデュラム召喚');
+
+                    if (impulseNames.some(n => nameJa.includes(n) || name.includes(n)) && isSpecialSummonEffect) {
+                        currentOptions.push({
+                            label: formatLog('ui_impulse_negate'),
+                            value: 'impulse'
+                        });
+                    }
+                }
+            }
+
             useGameStore.setState({
                 effectSelectionState: {
                     isOpen: true,
@@ -5052,6 +5103,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 get().processUiQueue();
                             };
                             performZeusCheck(resolveImpermanence, negateImpermanence, '無限泡影', 'Infinite Impermanence');
+                            return;
+                        }
+
+                        if (val === 'impulse') {
+                            const resolveImpulse = () => {
+                                set({ showImpulseCutIn: true, impulseUsed: true });
+                                const activatorCard = state.cards[activatorId!];
+                                get().addLog(formatLog('log_impulse_negated', { card: getCardName(activatorCard, state.language) }));
+                                get().pushHistory();
+                                setTimeout(() => {
+                                    set({ showImpulseCutIn: false });
+                                    get().pushHistory();
+                                }, 1333);
+                                onSelect(options[0].value, true);
+                                if (state.infiniteImpermanenceUsed && activatorId) {
+                                    get().addLog(formatLog('log_impulse_destroyed', { card: getCardName(activatorCard, state.language) }));
+                                    get().moveCard(activatorId, 'GRAVEYARD');
+                                }
+                                get().processUiQueue();
+                            };
+                            resolveImpulse();
                             return;
                         }
 
@@ -5342,6 +5414,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 drollActive: state.drollActive,
                 nibiruSimulationEnabled: state.nibiruSimulationEnabled,
                 nibiruUsed: state.nibiruUsed,
+                impulseSimulationEnabled: state.impulseSimulationEnabled,
+                impulseUsed: state.impulseUsed,
                 selectedDeckCardId: state.selectedDeckCardId,
             };
 

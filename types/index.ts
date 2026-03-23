@@ -87,6 +87,9 @@ export interface GameState {
     nibiruSimulationEnabled: boolean;
     nibiruUsed: boolean;
     showNibiruCutIn: boolean;
+    impulseSimulationEnabled: boolean;
+    impulseUsed: boolean;
+    showImpulseCutIn: boolean;
     zeusNegationUsed: boolean;
     showZoneInLog: boolean;
     logCount?: number; // Optional count of logs for optimized history snapshots

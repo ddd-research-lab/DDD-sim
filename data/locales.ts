@@ -352,6 +352,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'prompt_gilgamesh_p_place': 'ギルガメス：デッキから「DD」Pモンスター2体をPゾーンに置く？',
     'prompt_zero_machinex_p_place': 'DDD零死王ゼロ・マキナ：デッキから「契約書」を置く？',
     'prompt_zero_machinex_destruction_p': 'DDD零死王ゼロ・マキナ：Pゾーンに置きますか？',
+    'prompt_zero_king_contract': '零王の契約書：カードを破壊して特殊召喚しますか？',
     'prompt_lance_soldier_level': 'ランス・ソルジャー：レベルを変更？',
     'prompt_lance_level_select': 'レベルをいくつ上げますか？（最大{max}）',
 
@@ -428,6 +429,9 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_droll_blocked': 'ドロール&ロックバードの効果により、この効果は発動できません',
     'ui_infinite_impermanence_negate': '無限泡影で無効',
     'log_infinite_impermanence_negated': '相手が無限泡影を発動！{card}の効果が無効化されました',
+    'ui_impulse_negate': '霊王の波動で無効',
+    'log_impulse_negated': '相手が霊王の波動を発動！{card}の効果が無効化されました',
+    'log_impulse_destroyed': '相手の霊王の波動の効果で{card}は破壊されました',
     'log_nibiru_activated': '原始生命態ニビルの効果を発動！フィールドのモンスターを全てリリースし、このカードを特殊召喚。相手フィールドにトークンを特殊召喚',
     'log_zeus_negation': '{zeus}の効果を発動！{card}の発動を無効にし除外',
     'ui_zeus_negate': 'ラグナロクで無効',
