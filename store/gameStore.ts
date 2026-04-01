@@ -2623,7 +2623,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const state = get();
         if (state.summonCount >= 5 && !state.nibiruUsed && state.nibiruSimulationEnabled) {
             set({ showNibiruCutIn: true, nibiruUsed: true });
-            state.addLog(formatLog('log_activate_effect', { card: state.language === 'ja' ? '原始生命態ニビル' : 'Nibiru, the Primal Being' }));
+            state.addLog(formatLog('log_nibiru_simplified'));
             setTimeout(() => {
                 set({ showNibiruCutIn: false });
 
@@ -2640,14 +2640,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         const attachedMats = finalState.materials[id];
                         if (attachedMats && attachedMats.length > 0) {
                             attachedMats.forEach(matId => {
-                                finalState.moveCard(matId, 'GRAVEYARD');
+                                finalState.moveCard(matId, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
                             });
                         }
 
                         if (card.subType?.includes('PENDULUM')) {
-                            finalState.moveCard(id, 'EXTRA_DECK');
+                            finalState.moveCard(id, 'EXTRA_DECK', undefined, undefined, false, false, undefined, true);
                         } else {
-                            finalState.moveCard(id, 'GRAVEYARD');
+                            finalState.moveCard(id, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
                         }
                     });
 
@@ -2666,7 +2666,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     if (targetIndex !== -1) {
                         monsterZones[targetIndex] = tokenId;
                         set({ monsterZones });
-                        get().addLog(finalState.language === 'ja' ? '原始生命態トークンが特殊召喚されました！' : 'Primal Being Token Special Summoned!');
                     }
                 };
 
