@@ -231,6 +231,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_genghis_invoked': 'ジンギスの効果を発動',
     'log_genghis_ss': '{card}を蘇生（{source}効果）',
     'log_ragnarok_ss': '{card}を蘇生（{source}効果）',
+    'log_ragnarok_p_simplified': '{card}蘇生（アビス効果：{damage}ダメ）',
     'log_clovis_ss': '{card}を蘇生（{source}効果）',
     'log_contract_search': '{card}をサーチ（地獄門の契約書効果）',
     'log_swirl_fusion': 'スワラル・スライムの効果で{card}を融合召喚',

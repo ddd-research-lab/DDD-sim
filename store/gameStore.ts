@@ -427,12 +427,10 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     s2.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
                                         const s3 = useGameStore.getState();
                                         const targetName = getCardName(store.cards[tid], s3.language);
-                                        const sourceName = getCardName(store.cards[selfId], s3.language) + ' (P効果)';
                                         s3.moveCard(tid, 'MONSTER_ZONE', i, 'GRAVEYARD', false, true, undefined, true);
                                         s3.changeLP(-1000);
                                         useGameStore.setState({ isTellBuffActive: true });
-                                        s3.addLog(formatLog('log_ragnarok_ss', { card: targetName, source: sourceName }));
-                                        s3.addLog(formatLog('log_take_damage', { amount: '1000' }));
+                                        s3.addLog(formatLog('log_ragnarok_p_simplified', { card: targetName, damage: '1000' }));
                                     });
                                 }
                             },
@@ -5851,7 +5849,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== cardId) }));
             const cardDef = store.cards[cardId];
             if (cardDef && EFFECT_LOGIC[cardDef.cardId]) {
-                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019') {
+                const isAbyssInPZone = cardDef.cardId === 'c008' && [0, 4].some(idx => get().spellTrapZones[idx] === cardId);
+                if (cardDef.cardId !== 'c007' && cardDef.cardId !== 'c019' && !isAbyssInPZone) {
                     store.addLog(formatLog('log_trigger_activated', { card: getCardName(cardDef, store.language) }));
                 }
                 // Execute logic as 'TRIGGER'
