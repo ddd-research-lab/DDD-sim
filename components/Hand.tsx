@@ -15,6 +15,7 @@ export function Hand() {
     return (
         <div
             ref={setNodeRef}
+            data-zone-id="HAND"
             style={{
                 display: 'flex',
                 justifyContent: 'center',

@@ -2536,6 +2536,8 @@ interface GameStore extends GameState {
     returnFromJump: () => void; // Return to state before jump
     jumpHistory: Partial<GameState>[]; // Stack of states before jumps
     isReplaying: boolean;
+    replayAnimations: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[] | null;
+    replayAnimDuration: number; // ms, derived from replaySpeed
     activeEffectCardId: string | null;
     setActiveEffectCard: (cardId: string | null) => void;
     replay: () => void;
@@ -2759,6 +2761,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     isReplaying: false,
     isHistoryBatching: false,
     replaySpeed: 5,
+    replayAnimations: null,
+    replayAnimDuration: 200,
     cycleReplaySpeed: () => set((state) => ({ replaySpeed: state.replaySpeed >= 5 ? 1 : state.replaySpeed + 1 })),
     activeEffectCardId: null,
     modalQueue: [],
@@ -3696,7 +3700,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                 // Zero Machinex (c030) trigger: Trigger if DDD or Dark Contract destroyed by effect
                 // Zero Machinex (c030) trigger: Trigger if DDD or Dark Contract destroyed by effect
-                const lowerName = card.name.toLowerCase();
+                const lowerName = card.name ? card.name.toLowerCase() : '';
                 // Fix: Usage strictly requires "DDD" or "Dark Contract". "DD" is NOT sufficient.
                 const isDDDOrContract = lowerName.includes('ddd') || lowerName.includes('contract') || lowerName.includes('契約書');
 
@@ -5770,7 +5774,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     setReplaySpeed: (speed) => set({ replaySpeed: speed }),
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
-    stopReplay: () => set({ isReplaying: false }),
+    stopReplay: () => set({ isReplaying: false, replayAnimations: null }),
     replay: async (skipSnapshot = false) => {
         // Ensure the latest action is captured in history before starting replay
         if (!skipSnapshot && !get().isHistoryBatching) {
@@ -5783,10 +5787,72 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Store original logs so we don't accidentally wipe them out during replay steps
         const originalLogs = [...get().logs];
 
-        set({ isReplaying: true, logs: [], currentStepIndex: -1 });
+        // Animation duration = (1000ms / speed) * 0.5 (leave other half for "pause" between steps)
+        const animDuration = Math.floor((1000 / (replaySpeed || 1)) * 0.5);
+        const pauseDuration = Math.floor((1000 / (replaySpeed || 1)) * 0.5);
+
+        set({ isReplaying: true, logs: [], currentStepIndex: -1, replayAnimDuration: animDuration });
+
+        // Helper: get zone id string from snapshot state for a given card
+        const getZoneIdOfCard = (
+            snap: Partial<any>,
+            cardId: string
+        ): string | null => {
+            if (!snap) return null;
+            if (Array.isArray(snap.hand) && snap.hand.includes(cardId)) return 'HAND';
+            if (Array.isArray(snap.graveyard) && snap.graveyard.includes(cardId)) return 'GRAVEYARD';
+            if (Array.isArray(snap.banished) && snap.banished.includes(cardId)) return 'BANISHED';
+            if (Array.isArray(snap.extraDeck) && snap.extraDeck.includes(cardId)) return 'EXTRA_DECK';
+            if (Array.isArray(snap.deck) && snap.deck.includes(cardId)) return 'DECK';
+            if (snap.fieldZone === cardId) return 'FIELD_ZONE';
+            if (Array.isArray(snap.monsterZones)) {
+                const idx = snap.monsterZones.indexOf(cardId);
+                if (idx !== -1) return `MONSTER_ZONE_${idx}`;
+            }
+            if (Array.isArray(snap.spellTrapZones)) {
+                const idx = snap.spellTrapZones.indexOf(cardId);
+                if (idx !== -1) return `SPELL_TRAP_ZONE_${idx}`;
+            }
+            if (Array.isArray(snap.extraMonsterZones)) {
+                const idx = snap.extraMonsterZones.indexOf(cardId);
+                if (idx !== -1) return `EXTRA_MONSTER_ZONE_${idx}`;
+            }
+            return null;
+        };
+
+        // Helper: get DOM rect for a zone by its data-zone-id
+        const getZoneRect = (zoneId: string): DOMRect | null => {
+            if (typeof document === 'undefined') return null;
+            const el = document.querySelector(`[data-zone-id="${zoneId}"]`);
+            return el ? el.getBoundingClientRect() : null;
+        };
+
+        // Helper: get DOM rect for a card by its data-card-id
+        const getCardRect = (cardId: string): DOMRect | null => {
+            if (typeof document === 'undefined') return null;
+            const el = document.querySelector(`[data-card-id="${cardId}"]`);
+            return el ? el.getBoundingClientRect() : null;
+        };
+
+        // Helper: collect all unique card IDs across all zone arrays in a snapshot
+        const getAllZoneCardIds = (snap: Partial<any>): Set<string> => {
+            const ids = new Set<string>();
+            const add = (v: any) => { if (typeof v === 'string') ids.add(v); };
+            snap.hand?.forEach(add);
+            snap.graveyard?.forEach(add);
+            snap.banished?.forEach(add);
+            snap.extraDeck?.forEach(add);
+            snap.monsterZones?.forEach(add);
+            snap.spellTrapZones?.forEach(add);
+            snap.extraMonsterZones?.forEach(add);
+            snap.deck?.forEach(add);
+            if (snap.fieldZone) ids.add(snap.fieldZone);
+            return ids;
+        };
 
         // Track previous state to detect changes
         let prevPendulumSummonCount = history[0]?.pendulumSummonCount || 0;
+        let prevSnapshot: Partial<any> | null = null;
 
         for (let i = 0; i < history.length; i++) {
             if (!get().isReplaying) break; // Allow stop
@@ -5805,8 +5871,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
             prevPendulumSummonCount = sCount;
 
+            // --- Detect moved cards (diff between prev and current snapshot) ---
+            const moves: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[] = [];
+
+            if (prevSnapshot) {
+                const prevIds = getAllZoneCardIds(prevSnapshot);
+                const currIds = getAllZoneCardIds(snapshot);
+                const allCards = get().cards;
+                const prevSnap = prevSnapshot!; // safe: guarded by if(prevSnapshot)
+
+                // Cards that appear in current but not prev: these moved INTO a new zone
+                // Cards that disappear from prev but not curr: moved OUT
+                // Moved card = in prev zone A, now in zone B (same cardId, different zone)
+                prevIds.forEach(cardId => {
+                    const prevZone = getZoneIdOfCard(prevSnap, cardId);
+                    const currZone = getZoneIdOfCard(snapshot, cardId);
+                    if (prevZone && currZone && prevZone !== currZone && allCards[cardId]) {
+                        // card moved from prevZone to currZone
+                        const fromEl = document.querySelector(`[data-card-id="${cardId}"]`);
+                        const fromRect = fromEl
+                            ? fromEl.getBoundingClientRect()
+                            : getZoneRect(prevZone);
+                        const toRect = getZoneRect(currZone);
+                        if (fromRect && toRect) {
+                            moves.push({ cardId, card: allCards[cardId], fromRect, toRect });
+                        }
+                    }
+                });
+            }
+
             const logCount = snapshot.logCount || 0;
             const currentLogs = originalLogs.slice(0, logCount);
+
+            if (moves.length > 0 && animDuration > 30) {
+                console.log(`[Replay Step ${i}] Detected ${moves.length} moves:`, moves);
+                // Show flying card animations for all moved cards simultaneously
+                set({ replayAnimations: moves });
+                await new Promise(resolve => setTimeout(resolve, animDuration));
+                set({ replayAnimations: null });
+            } else if (moves.length === 0) {
+                console.log(`[Replay Step ${i}] No moves detected.`);
+            }
 
             set({
                 ...snapshot,
@@ -5821,15 +5926,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 pendingChain: [],
                 isBatching: false,
                 isReplaying: true,
+                replayAnimations: null,
             });
 
-            const baseDelay = 1000;
-            const delay = baseDelay / (replaySpeed || 1);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            prevSnapshot = snapshot;
+
+            await new Promise(resolve => setTimeout(resolve, pauseDuration));
         }
 
         // Restore final state logs fully so another replay or regular play can continue
-        set({ isReplaying: false, activeEffectCardId: null, showPendulumCutIn: false, logs: originalLogs });
+        set({ isReplaying: false, activeEffectCardId: null, showPendulumCutIn: false, logs: originalLogs, replayAnimations: null });
     },
 
     // ... existing actions ...

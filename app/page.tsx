@@ -27,6 +27,7 @@ import { EffectSelectionModal } from '@/components/EffectSelectionModal';
 import { ShareModal } from '@/components/ShareModal';
 import { formatLog } from '@/data/locales';
 import { SimToggles } from '@/components/SimToggles';
+import { ReplayCardAnimationOverlay } from '@/components/ReplayCardAnimationOverlay';
 
 function ReplayLoader() {
   const searchParams = useSearchParams();
@@ -72,6 +73,7 @@ export default function Home() {
     showDrollCutIn,
     showInfiniteImpermanenceCutIn,
     showNibiruCutIn,
+    showImpulseCutIn,
     logOrder,
     toggleLogOrder,
     stopReplay,
@@ -112,6 +114,7 @@ export default function Home() {
     'DDDヘッドハント': 'ヘッドハント',
     '灰流うらら': 'うらら',
     '無限泡影': '泡影',
+    '霊王の波動': 'インパルス',
     '原始生命態ニビル': 'ニビル',
     'ドロール＆ロックバード': 'ドロバ',
     'ドロール&ロックバード': 'ドロバ',
@@ -432,6 +435,7 @@ export default function Home() {
       <Suspense fallback={null}>
         <ReplayLoader />
       </Suspense>
+      <ReplayCardAnimationOverlay />
       <main
         ref={mainRef}
         className="main-container"
@@ -845,6 +849,79 @@ export default function Home() {
                 letterSpacing: '0.2em'
               }}>
                 無限泡影
+              </h2>
+            </div>
+          </div>
+        )}
+
+        {/* Impulse Cut-in Overlay */}
+        {showImpulseCutIn && (
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            overflow: 'hidden'
+          }}>
+            <style jsx>{`
+              @keyframes impulseSlashFade {
+                0% { transform: translateX(100%) skewX(-20deg); opacity: 0; }
+                15% { transform: translateX(0) skewX(-20deg); opacity: 1; }
+                85% { transform: translateX(0) skewX(-20deg); opacity: 1; }
+                100% { transform: translateX(0) skewX(-20deg); opacity: 0; }
+              }
+              @keyframes impulseFadeOut {
+                0% { opacity: 0; transform: scale(0.9); }
+                15% { opacity: 1; transform: scale(1); }
+                85% { opacity: 1; transform: scale(1); }
+                100% { opacity: 0; transform: scale(1); }
+              }
+            `}</style>
+
+            {/* Background Slash (Purple) */}
+            <div style={{
+              position: 'absolute',
+              width: '120%',
+              height: '40%',
+              background: 'linear-gradient(90deg, transparent, rgba(156, 39, 176, 0.4), transparent)',
+              animation: 'impulseSlashFade 1.333s ease-in-out forwards',
+              zIndex: 1
+            }} />
+
+            {/* Impulse Image Area */}
+            <div style={{
+              position: 'relative',
+              zIndex: 2,
+              animation: 'impulseFadeOut 1.333s ease-in-out forwards',
+              textAlign: 'center'
+            }}>
+              <img
+                src="https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260225/20260225183937.png"
+                alt="Dominus Impulse"
+                style={{
+                  height: '300px',
+                  boxShadow: '0 0 50px rgba(156, 39, 176, 0.6)',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.3)'
+                }}
+              />
+              <h2 style={{
+                color: '#fff',
+                marginTop: '12px',
+                fontSize: '1.8rem',
+                fontWeight: 'bold',
+                textShadow: '0 0 10px #9c27b0, 0 0 20px #9c27b0',
+                fontFamily: 'serif',
+                letterSpacing: '0.2em'
+              }}>
+                霊王の波動
               </h2>
             </div>
           </div>

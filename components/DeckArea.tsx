@@ -200,6 +200,7 @@ export function DeckArea() {
         </div>
       </div>
 
+      <div data-zone-id="DECK">
       <Zone id="deck-zone" type="DECK" label={formatLog('ui_main_deck_area')} style={{ width: '100%', height: 'auto', minHeight: '140px', margin: 0 }}>
         <div style={{
           display: 'flex',
@@ -256,6 +257,7 @@ export function DeckArea() {
           )}
         </div>
       </Zone>
+      </div>
 
     </div >
   );

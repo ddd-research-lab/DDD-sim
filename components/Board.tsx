@@ -117,19 +117,19 @@ export function Board() {
             </div>
 
             {/* Field Zone (Col 1) */}
-            <div style={{ gridColumn: '1 / 2', gridRow: '2 / 3' }}>
+            <div data-zone-id="FIELD_ZONE" style={{ gridColumn: '1 / 2', gridRow: '2 / 3' }}>
                 <Zone id="field-zone" type="FIELD_ZONE" label={formatLog('ui_field')}>
                     {renderCard(fieldZone)}
                 </Zone>
             </div>
 
             {/* Extra Monster Zones (Col 3 and 5) */}
-            <div style={{ gridColumn: '3 / 4', gridRow: '1 / 2' }}>
+            <div data-zone-id="EXTRA_MONSTER_ZONE_0" style={{ gridColumn: '3 / 4', gridRow: '1 / 2' }}>
                 <Zone id="emz-1" type="EXTRA_MONSTER_ZONE" index={0} label={`${formatLog('ui_emz')} 1`}>
                     {renderCard(extraMonsterZones[0])}
                 </Zone>
             </div>
-            <div style={{ gridColumn: '5 / 6', gridRow: '1 / 2' }}>
+            <div data-zone-id="EXTRA_MONSTER_ZONE_1" style={{ gridColumn: '5 / 6', gridRow: '1 / 2' }}>
                 <Zone id="emz-2" type="EXTRA_MONSTER_ZONE" index={1} label={`${formatLog('ui_emz')} 2`}>
                     {renderCard(extraMonsterZones[1])}
                 </Zone>
@@ -216,7 +216,7 @@ export function Board() {
             )}
 
             {/* Banished (Col 7, Row 2 - shifted down) */}
-            <div style={{
+            <div data-zone-id="BANISHED" style={{
                 gridColumn: '7 / 8',
                 gridRow: '2 / 3',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
@@ -239,7 +239,7 @@ export function Board() {
             </div>
 
             {/* Graveyard (Col 7, Row 3 - shifted down) */}
-            <div style={{
+            <div data-zone-id="GRAVEYARD" style={{
                 gridColumn: '7 / 8',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
@@ -263,7 +263,7 @@ export function Board() {
 
             {/* --- Row 2: Monsters (Cols 2-6) --- */}
             {monsterZones.map((cardId, i) => (
-                <div key={`mz-${i}`} style={{ gridColumn: `${2 + i} / ${3 + i}`, gridRow: '2 / 3' }}>
+                <div key={`mz-${i}`} data-zone-id={`MONSTER_ZONE_${i}`} style={{ gridColumn: `${2 + i} / ${3 + i}`, gridRow: '2 / 3' }}>
                     <Zone id={`mz-${i}`} type="MONSTER_ZONE" index={i} label={formatLog('ui_monster_zone_n', { index: (i + 1).toString() })}>
                         {renderCard(cardId)}
                     </Zone>
@@ -273,7 +273,7 @@ export function Board() {
             {/* --- Row 3: Extra Deck & S/T (Cols 2-6) --- */}
 
             {/* Extra Deck (Col 1, Row 3) */}
-            <div style={{
+            <div data-zone-id="EXTRA_DECK" style={{
                 gridColumn: '1 / 2',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
@@ -293,7 +293,7 @@ export function Board() {
 
             {/* S/T Zones */}
             {spellTrapZones.map((cardId, i) => (
-                <div key={`stz-${i}`} style={{ gridColumn: `${2 + i} / ${3 + i}`, gridRow: '3 / 4' }}>
+                <div key={`stz-${i}`} data-zone-id={`SPELL_TRAP_ZONE_${i}`} style={{ gridColumn: `${2 + i} / ${3 + i}`, gridRow: '3 / 4' }}>
                     <Zone id={`stz-${i}`} type="SPELL_TRAP_ZONE" index={i} label={`S/T ${i + 1}`}>
                         {renderCard(cardId)}
                     </Zone>

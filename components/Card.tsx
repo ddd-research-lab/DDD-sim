@@ -130,6 +130,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             ref={setNodeRef}
             {...listeners}
             {...attributes}
+            data-card-id={card.id}
             className={`
                 relative
                 ${isTriggerCandidate ? 'trigger-glow' : ''}
