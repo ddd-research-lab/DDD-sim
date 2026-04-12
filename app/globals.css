@@ -145,3 +145,57 @@ button {
     /* Show toggle button */
   }
 }
+
+/* Cyber Glitch Effect for Replay Highlight */
+.cyber-glitch-active {
+  animation: cardCyberGlitch 0.5s linear forwards !important;
+  z-index: 100 !important;
+  position: relative;
+}
+
+.cyber-glitch-inner {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.cyber-glitch-inner::before {
+  content: '';
+  position: absolute;
+  top: -100%; left: 0; right: 0; height: 300%;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(150, 255, 255, 0.15) 3px, rgba(150, 255, 255, 0.15) 4px);
+  animation: scanlineMove 0.5s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.cyber-glitch-inner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.4%22/%3E%3C/svg%3E");
+  mix-blend-mode: color-dodge;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@keyframes cardCyberGlitch {
+  0% { filter: brightness(1) contrast(1); transform: scale(1); box-shadow: 0 0 0px transparent; }
+  10% { filter: brightness(1.5) contrast(1.2); transform: scale(1.02) translate(-1px, 2px); box-shadow: 0 0 10px 5px rgba(255,255,255,0.7); }
+  20% { filter: brightness(1.3) contrast(1.5); transform: scale(1.02) translate(1px, -1px); }
+  30% { filter: brightness(2.0); opacity: 0.8; box-shadow: 0 0 20px 10px rgba(255,255,255,0.9), 0 0 30px 15px rgba(0, 255, 255, 0.6); }
+  40% { filter: brightness(1.8) contrast(1.3); transform: scale(1.04) translate(0, 0); opacity: 0.9;}
+  50% { transform: scale(1.04) translate(-1px, -1px); opacity: 0.95; }
+  60% { transform: scale(1.02) translate(1px, 1px); }
+  70% { filter: brightness(1.5); transform: scale(1.02) skewX(-3deg); box-shadow: 0 0 15px 8px rgba(255,255,255,0.8), 0 0 25px 10px rgba(0, 255, 255, 0.5); }
+  80% { transform: scale(1.02) skewX(2deg); }
+  100% { filter: brightness(1.2); transform: scale(1.02); box-shadow: 0 0 15px 5px rgba(255,255,255,0.6), 0 0 20px 10px rgba(0, 255, 255, 0.4); }
+}
+
+@keyframes scanlineMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(30%); }
+}

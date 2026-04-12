@@ -215,7 +215,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_kepler_returned_hand': '{card}を手札に戻す（ケプラー効果）',
     'log_count_surveyor_search': '{card}をサーチ（DDカウント・サーベイヤー効果）',
     'log_orthros_summon_success': 'オルトロスを手札から特殊召喚',
-    'log_orthros_hand_ss': '{card}を特殊召喚（DDオルトロス効果）',
+    'log_orthros_hand_ss': 'オルトロスを特殊召喚（オルトロス効果）',
     'log_orthros_no_empty_zone': '空きゾーンがないため、オルトロスを特殊召喚できません',
     'log_scale_surveyor_hand_ss_flg': 'Scale Surveyor: 手札からの特殊召喚は既にこのターン使用されています',
     'log_scale_surveyor_no_p_card': 'Scale Surveyor: 自分フィールドに「DD」Pモンスターカードがありません',

@@ -58,14 +58,14 @@ export function EffectSelectionModal() {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '10px', // Reduced from 15px
-                                padding: opt.imageUrl ? '10px' : '10px 15px', // Reduced padding
+                                gap: '10px',
+                                padding: opt.imageUrl ? '10px' : '10px 15px',
                                 background: 'rgba(255, 255, 255, 0.05)',
                                 color: 'white',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                 borderRadius: '12px',
                                 cursor: 'pointer',
-                                fontSize: '14px', // Reduced from 16px
+                                fontSize: '14px',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 textAlign: opt.imageUrl ? 'center' : 'left',
                                 position: 'relative',
@@ -74,7 +74,7 @@ export function EffectSelectionModal() {
                             onMouseOver={(e) => {
                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                                 e.currentTarget.style.borderColor = '#3b82f6';
-                                e.currentTarget.style.transform = 'translateY(-3px)'; // Reduced from -5px
+                                e.currentTarget.style.transform = 'translateY(-3px)';
                                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(59, 130, 246, 0.3)';
                             }}
                             onMouseOut={(e) => {
@@ -98,8 +98,7 @@ export function EffectSelectionModal() {
                                 />
                             )}
                             <span style={{ fontWeight: '500', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{opt.label}</span>
-                            {/* Shiny overlay effect on hover */}
-                            <div style={{
+                            <div className="shiny-overlay" style={{
                                 position: 'absolute',
                                 top: 0,
                                 left: '-100%',
@@ -109,7 +108,7 @@ export function EffectSelectionModal() {
                                 transition: 'all 0.5s',
                                 transform: 'skewX(-25deg)',
                                 pointerEvents: 'none'
-                            }} className="shiny-overlay" />
+                            }} />
                         </button>
                     ))}
                 </div>

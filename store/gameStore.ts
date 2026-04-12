@@ -431,6 +431,12 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                         s3.changeLP(-1000);
                                         useGameStore.setState({ isTellBuffActive: true });
                                         s3.addLog(formatLog('log_ragnarok_p_simplified', { card: targetName, damage: '1000' }));
+                                        // Trigger Orthros (c011) if in Hand
+                                        const s4 = useGameStore.getState();
+                                        const orthros = s4.hand.find((id: string) => s4.cards[id].cardId === 'c011');
+                                        if (orthros) {
+                                            useGameStore.setState(prev => ({ triggerCandidates: [...prev.triggerCandidates, orthros] }));
+                                        }
                                     });
                                 }
                             },
@@ -506,7 +512,7 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                                     if (emptyIndices.length > 0) {
                                         cs.startZoneSelection(formatLog('prompt_select_zone'), (t: string, zi: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(zi), (t: string, zi: number) => {
                                             const finalState = useGameStore.getState();
-                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, `mats:（コスト：${costName}）`);
+                                            finalState.moveCard(selfId, 'MONSTER_ZONE', zi, 'HAND', true, true, `mats:コスト：${costName}`);
                                             // Log handled by moveCard
 
 
@@ -866,9 +872,8 @@ const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, fromLocatio
                     const emptyIndices = currentStore.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
                     if (emptyIndices.length > 0) {
                         currentStore.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
-                            const ssCardName = getCardName(useGameStore.getState().cards[selfId], useGameStore.getState().language);
                             useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', true, true, undefined, true);
-                            useGameStore.getState().addLog(formatLog('log_orthros_hand_ss', { card: ssCardName }));
+                            useGameStore.getState().addLog(formatLog('log_orthros_hand_ss'));
                         });
                     } else {
                         currentStore.addLog(formatLog('log_orthros_no_empty_zone'));
@@ -2452,13 +2457,16 @@ interface GameStore extends GameState {
     // Actions
     initializeGame: (cardDefs: CardDatabase, deckList: string[]) => void;
     // Move Card Generic Action
-    moveCard: (cardId: string, toZone: ZoneType, toIndex?: number, fromLocation?: string, suppressTrigger?: boolean, isSpecialSummon?: boolean, summonVariant?: string, skipLog?: boolean) => void;
+    moveCard: (cardId: string, toZone: ZoneType, toIndex?: number, fromLocation?: string, suppressTrigger?: boolean, isSpecialSummon?: boolean, summonVariant?: string, skipLog?: boolean, suppressHistoryPush?: boolean) => void;
     changeLP: (amount: number) => void;
     addLog: (message: string) => void;
     setDragState: (isDragging: boolean, id: string | null) => void;
     startSearch: (filter: (card: Card) => boolean, onSelect: (cardId: string) => void, prompt?: string, sourceList?: string[]) => void;
     resolveSearch: (cardId: string) => void;
     cancelSearch: () => void;
+    cancelTargeting: () => void;
+    cancelZoneSelection: () => void;
+    cancelEffectSelection: () => void;
     drawCard: (skipLog?: boolean) => void;
     setDeck: (newDeck: string[]) => void;
     shuffleDeck: () => void;
@@ -2469,7 +2477,8 @@ interface GameStore extends GameState {
     resolveSynchroSummon: (tunerId: string, nonTunerIds: string[], synchroCardId: string, toZoneType: ZoneType, toZoneIndex: number) => void;
     startXyzSummon: (extraDeckCardId: string) => void;
     resolveXyzSummon: (xyzCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
-
+    resolveLinkSummon: (linkCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
+    
     startEffectSelection: (prompt: string, options: { label: string, value: string }[], onChoice: (val: string, isNegated?: boolean) => void, canAshBlossom?: boolean, activatorId?: string) => void;
     resolveEffectSelection: (val: string) => void;
 
@@ -2605,6 +2614,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     impulseUsed: false,
     showImpulseCutIn: false,
     zeusNegationUsed: false,
+    isHistoryBatching: false,
 
     // Setters
     setBackgroundColor: (color) => set({ backgroundColor: color }),
@@ -2759,8 +2769,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     initialExtraDeckCardIds: [],
     lastEffectSourceId: null,
     isReplaying: false,
-    isHistoryBatching: false,
-    replaySpeed: 5,
+    replaySpeed: 2,
     replayAnimations: null,
     replayAnimDuration: 200,
     cycleReplaySpeed: () => set((state) => ({ replaySpeed: state.replaySpeed >= 5 ? 1 : state.replaySpeed + 1 })),
@@ -2984,6 +2993,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
             history: [], // Reset history
             currentStepIndex: -1, // Initialize currentStepIndex
+            isHistoryBatching: false,
 
             // Handtraps & Simulation Flags
             ashBlossomUsed: false,
@@ -3003,8 +3013,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
 
-    moveCard: (cardId, toZone, toIndex = 0, fromLocation = undefined, suppressTrigger = false, isSpecialSummon = false, summonVariant = undefined, skipLog = false) => {
-        get().pushHistory();
+    moveCard: (cardId, toZone, toIndex = 0, fromLocation = undefined, suppressTrigger = false, isSpecialSummon = false, summonVariant = undefined, skipLog = false, suppressHistoryPush = false) => {
+        if (!suppressHistoryPush) {
+            get().pushHistory();
+        }
         const startState = get(); // Fresh state before move
         const state = startState; // Alias for compatibility with existing code
         const { isDragging, activeDragId } = startState;
@@ -3092,6 +3104,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     return; // Abort
                 }
 
+                useGameStore.setState({ isHistoryBatching: true }); // Start batching before material selection
                 store.startTargeting(
                     (c) => (store.monsterZones.includes(c.id) || store.extraMonsterZones.includes(c.id)) && c.name.includes('DD'),
                     (mat1) => {
@@ -3104,24 +3117,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 const m1Loc = store.monsterZones.includes(mat1) ? 'MONSTER_ZONE' : 'EXTRA_MONSTER_ZONE';
                                 const m2Loc = store.monsterZones.includes(mat2) ? 'MONSTER_ZONE' : 'EXTRA_MONSTER_ZONE';
 
-                                set({ isHistoryBatching: true });
-                                try {
-                                    set({ isLinkSummoningActive: true, isMaterialMove: true });
-                                    get().moveCard(mat1, 'GRAVEYARD', 0, m1Loc);
-                                    get().moveCard(mat2, 'GRAVEYARD', 0, m2Loc);
-                                    // Suppress manual log control, let moveCard handle it with variant 'link'
-                                    get().moveCard(cardId, toZone, toIndex, 'EXTRA_DECK', false, true, 'link');
-                                    set({ isLinkSummoningActive: false, isMaterialMove: false });
-
-                                    // const gilgameshName = getCardName(get().cards[cardId], get().language);
-                                    // get().addLog(formatLog('log_link_summon_success', { card: gilgameshName }));
-                                    const matNames = [mat1, mat2].map(id => getCardName(get().cards[id], get().language)).join(', ');
-                                    get().addLog(formatLog('log_summon_materials', { materials: matNames }));
-
-                                } finally {
-                                    set({ isHistoryBatching: false });
-                                    get().pushHistory();
-                                }
+                                get().resolveLinkSummon(cardId, [mat1, mat2], toZone, toIndex);
 
                                 // Trigger Check: Orthros in Hand?
                                 const s2 = get();
@@ -3152,6 +3148,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 // Recursive Selection Logic
+                useGameStore.setState({ isHistoryBatching: true }); // Start batching for Ragnarok link selection
                 const selectedMaterials: string[] = [];
                 let currentRating = 0;
 
@@ -3166,27 +3163,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         const materialsText = selectedMaterials.map(id => getCardName(s.cards[id], s.language)).join(', ');
                         s.addLog(formatLog('log_ragnarok_link_start', { materials: materialsText }));
 
-                        set({ isHistoryBatching: true });
-                        try {
-                            // 1. Send Materials to GY
-                            set({ isLinkSummoningActive: true, isMaterialMove: true });
-                            selectedMaterials.forEach(mid => {
-                                const loc = s.monsterZones.includes(mid) ? 'MONSTER_ZONE' : 'EXTRA_MONSTER_ZONE';
-                                get().moveCard(mid, 'GRAVEYARD', 0, loc);
-                            });
-                            // 2. Summon Zeus
-                            get().moveCard(cardId, toZone, toIndex, 'EXTRA_DECK', false, true);
-                            set({ isLinkSummoningActive: false, isMaterialMove: false });
-
-                            const ragnarokName = getCardName(get().cards[cardId], get().language);
-                            // Log handled by moveCard
-                            const matNames = selectedMaterials.map(id => getCardName(get().cards[id], get().language)).join(', ');
-                            get().addLog(formatLog('log_summon_materials', { materials: matNames }));
-
-                        } finally {
-                            set({ isHistoryBatching: false });
-                            get().pushHistory();
-                        }
+                        get().resolveLinkSummon(cardId, selectedMaterials, toZone, toIndex);
                         return;
                     }
 
@@ -4450,6 +4427,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     startSynchroSummon: (extraDeckCardId) => {
+        useGameStore.setState({ isHistoryBatching: true }); // Start batching for Synchro selection
         const store = get();
         const card = store.cards[extraDeckCardId];
         const level = card.level || 0;
@@ -4545,7 +4523,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 
     startXyzSummon: (extraDeckCardId) => {
-        set({ isEffectActivated: true });
+        set({ isEffectActivated: true, isHistoryBatching: true }); // Start batching for Xyz selection
         const store = get();
         const card = store.cards[extraDeckCardId];
         const rank = card.rank || card.level || 0;
@@ -4823,24 +4801,49 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 
     resolveSynchroSummon: (tunerId, nonTunerIds, synchroCardId, toZoneType, toZoneIndex) => {
-        const store = get();
-        set({ isHistoryBatching: true });
-
+        set({ isHistoryBatching: true, isBatching: true });
         try {
             set({ isMaterialMove: true });
-            get().moveCard(tunerId, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+            get().moveCard(tunerId, 'GRAVEYARD', 0, undefined, true, false, undefined, true, true);
             nonTunerIds.forEach(id => {
-                get().moveCard(id, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                get().moveCard(id, 'GRAVEYARD', 0, undefined, true, false, undefined, true, true);
             });
             set({ isMaterialMove: false });
 
             const tunerName = getCardName(get().cards[tunerId], get().language);
             const nonTunerNames = nonTunerIds.map(id => getCardName(get().cards[id], get().language)).join('＋');
 
-            // Move Synchro Monster to Field
-            get().moveCard(synchroCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, `mats:${tunerName}＋${nonTunerNames}`, false);
+            // Move Synchro Monster to Field (suppressHistoryPush=true)
+            get().moveCard(synchroCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, `mats:${tunerName}＋${nonTunerNames}`, false, true);
         } finally {
-            set({ isHistoryBatching: false });
+            set({ isHistoryBatching: false, isBatching: false });
+            get().pushHistory();
+        }
+    },
+
+    resolveLinkSummon: (linkCardId, materialIds, destinationZoneId, toZoneIndex) => {
+        set({ isHistoryBatching: true, isBatching: true });
+        const store = get();
+        try {
+            set({ isLinkSummoningActive: true, isMaterialMove: true });
+            
+            // 1. Move all materials (Synchronously update state without pushing history)
+            materialIds.forEach(matId => {
+                const loc = store.monsterZones.includes(matId) ? 'MONSTER_ZONE' : 'EXTRA_MONSTER_ZONE';
+                // suppressHistoryPush=true, suppressTrigger=true, skipLog=true
+                get().moveCard(matId, 'GRAVEYARD', 0, loc, true, false, undefined, true, true);
+            });
+            
+            set({ isLinkSummoningActive: false, isMaterialMove: false });
+
+            // 2. Move Link Monster (This call will try to push history, but isHistoryBatching=true will stop it)
+            const matNames = materialIds.map(id => getCardName(get().cards[id], get().language)).join(', ');
+            get().moveCard(linkCardId, destinationZoneId, toZoneIndex, 'EXTRA_DECK', false, true, `link`, false, true);
+            
+            get().addLog(formatLog('log_summon_materials', { materials: matNames }));
+        } finally {
+            set({ isHistoryBatching: false, isBatching: false });
+            // 3. Manually push history ONCE after all moves are complete
             get().pushHistory();
         }
     },
@@ -4851,8 +4854,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const isXyzMonster = xyzCard.subType?.includes('XYZ') || xyzCardId === 'c018';
         const isArkCrisis = xyzCard.cardId === 'c029';
         const shouldAttach = isXyzMonster && !isArkCrisis;
-
-        set({ isHistoryBatching: true });
+        set({ isHistoryBatching: true, isBatching: true });
         try {
             // 1. Update Materials and Cleanup Modifiers
             set((state) => {
@@ -4899,14 +4901,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 else if (s.graveyard.includes(matId)) fromLoc = 'GRAVEYARD';
 
                 const destination = isArkCrisis ? 'BANISHED' : (shouldAttach ? 'MATERIAL' : 'GRAVEYARD');
-                get().moveCard(matId, destination, 0, fromLoc, true, false, undefined, true);
+                get().moveCard(matId, destination, 0, fromLoc, true, false, undefined, true, true);
             });
 
             const variant = `mats:${materialNames}`;
-            get().moveCard(xyzCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, variant, false);
+            get().moveCard(xyzCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, variant, false, true);
 
         } finally {
-            set({ isHistoryBatching: false });
+            set({ isHistoryBatching: false, isBatching: false });
             get().pushHistory();
         }
 
@@ -5228,6 +5230,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (zoneSelectionState.onSelect) {
             zoneSelectionState.onSelect(type, index);
         }
+    },
+
+    cancelTargeting: () => {
+        set({
+            targetingState: { isOpen: false, filter: null, onSelect: null, mode: 'normal' },
+            isHistoryBatching: false,
+            isBatching: false
+        });
+        get().processUiQueue();
+    },
+
+    cancelZoneSelection: () => {
+        set({
+            zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
+            isHistoryBatching: false,
+            isBatching: false
+        });
+        get().processUiQueue();
+    },
+
+    cancelEffectSelection: () => {
+        set({
+            effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null },
+            isHistoryBatching: false,
+            isBatching: false
+        });
+        get().processUiQueue();
     },
 
     changeLP: (amount) => {
@@ -5781,17 +5810,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
             get().pushHistory();
         }
 
-        const { history, replaySpeed } = get();
+        const { history } = get();
         if (get().isReplaying || history.length === 0) return;
 
         // Store original logs so we don't accidentally wipe them out during replay steps
         const originalLogs = [...get().logs];
 
-        // Animation duration = (1000ms / speed) * 0.5 (leave other half for "pause" between steps)
-        const animDuration = Math.floor((1000 / (replaySpeed || 1)) * 0.5);
-        const pauseDuration = Math.floor((1000 / (replaySpeed || 1)) * 0.5);
-
-        set({ isReplaying: true, logs: [], currentStepIndex: -1, replayAnimDuration: animDuration });
+        set({ isReplaying: true, logs: [], currentStepIndex: -1 });
 
         // Helper: get zone id string from snapshot state for a given card
         const getZoneIdOfCard = (
@@ -5861,18 +5886,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const sZones = snapshot.spellTrapZones;
             const sCount = snapshot.pendulumSummonCount ?? 0;
 
-            // Detect Pendulum Summon
-            const p1 = sZones ? sZones[0] : null;
-            const p4 = sZones ? sZones[4] : null;
-            if (sCount > prevPendulumSummonCount && p1 && p4) {
-                set({ showPendulumCutIn: true });
-                await new Promise(resolve => setTimeout(resolve, 1333));
-                set({ showPendulumCutIn: false });
-            }
-            prevPendulumSummonCount = sCount;
-
-            // --- Detect moved cards (diff between prev and current snapshot) ---
-            const moves: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[] = [];
+            // --- Detect moved cards FIRST (uses current DOM which hasn't been modified yet) ---
+            let moves: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[] = [];
 
             if (prevSnapshot) {
                 const prevIds = getAllZoneCardIds(prevSnapshot);
@@ -5900,15 +5915,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 });
             }
 
+            // Detect Pendulum Summon
+            const p1 = sZones ? sZones[0] : null;
+            const p4 = sZones ? sZones[4] : null;
+            if (sCount > prevPendulumSummonCount && p1 && p4) {
+                // Temporarily apply target P-Zones AND Hand to the screen so the cut-in looks correct.
+                // Updating both ensures the scale cards are moved cleanly without dnd-kit ID collisions (which caused "wiggling/click" effects).
+                set({ 
+                    spellTrapZones: sZones,
+                    hand: snapshot.hand // Prevents the card from existing in both Hand and P-Zone simultaneously
+                });
+                
+                // Remove scale moves from the flyer animation, since they just instantly snapped into place behind the cut-in
+                const scaleIds = [p1, p4].filter(Boolean);
+                moves = moves.filter(m => !scaleIds.includes(m.cardId));
+
+                set({ showPendulumCutIn: true });
+                await new Promise(resolve => setTimeout(resolve, 1333));
+                set({ showPendulumCutIn: false });
+            }
+            prevPendulumSummonCount = sCount;
+
+
+
             const logCount = snapshot.logCount || 0;
             const currentLogs = originalLogs.slice(0, logCount);
 
-            if (moves.length > 0 && animDuration > 30) {
+            // Dynamically calculate speed based on current state setting
+            const currentSpeed = get().replaySpeed || 1;
+            const totalStepTime = 1000 / currentSpeed;
+            const currentAnimDuration = Math.floor(totalStepTime * 0.7); // 70% of step time for smooth flying
+            const currentPauseDuration = Math.floor(totalStepTime * 0.3);
+
+            if (moves.length > 0 && currentAnimDuration > 30) {
                 console.log(`[Replay Step ${i}] Detected ${moves.length} moves:`, moves);
                 // Show flying card animations for all moved cards simultaneously
-                set({ replayAnimations: moves });
-                await new Promise(resolve => setTimeout(resolve, animDuration));
-                set({ replayAnimations: null });
+                set({ replayAnimations: moves, replayAnimDuration: currentAnimDuration });
+                await new Promise(resolve => setTimeout(resolve, currentAnimDuration));
+                // Do not set replayAnimations to null here! Do it together with the state update below
+                // to prevent a 1-frame flicker where both flying and placed cards are absent.
             } else if (moves.length === 0) {
                 console.log(`[Replay Step ${i}] No moves detected.`);
             }
@@ -5926,12 +5971,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 pendingChain: [],
                 isBatching: false,
                 isReplaying: true,
-                replayAnimations: null,
+                replayAnimations: null, // Clear animations exactly as the new state applies
             });
 
             prevSnapshot = snapshot;
 
-            await new Promise(resolve => setTimeout(resolve, pauseDuration));
+            await new Promise(resolve => setTimeout(resolve, currentPauseDuration));
         }
 
         // Restore final state logs fully so another replay or regular play can continue

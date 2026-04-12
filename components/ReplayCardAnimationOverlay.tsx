@@ -50,8 +50,19 @@ function FlyingCard({ move }: { move: ReplayCardMove }) {
         };
     };
 
-    const from = normalizeRect(fromRect);
     const to = normalizeRect(toRect);
+    
+    // Maintain constant size during flight to prevent visual size changes.
+    // Use the destination's normalized size for the entire animation.
+    const fixedWidth = to.width;
+    const fixedHeight = to.height;
+
+    const from = {
+        left: fromRect.left + (fromRect.width - fixedWidth) / 2,
+        top: fromRect.top + (fromRect.height - fixedHeight) / 2,
+        width: fixedWidth,
+        height: fixedHeight,
+    };
 
     const getCardColor = (type: string) => {
         switch (type) {
@@ -81,7 +92,7 @@ function FlyingCard({ move }: { move: ReplayCardMove }) {
             exit={{ opacity: 0 }}
             transition={{
                 duration: animDuration,
-                ease: [0.25, 0.1, 0.25, 1.0],
+                ease: [0.4, 0.0, 0.2, 1], // Smooth deceleration curve
             }}
             style={{
                 position: 'fixed',

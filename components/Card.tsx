@@ -138,7 +138,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                 ${isTargeting && !isValidTarget ? 'opacity-50 grayscale' : ''}
                 ${isSelected ? 'ring-4 ring-blue-500' : ''}
                 ${isDragging ? 'opacity-50' : ''}
-                hover:scale-105
+                ${isReplaying && activeEffectCardId === card.id ? 'cyber-glitch-active' : 'hover:scale-105'}
             `}
             // Removed transition-all duration-200 to let framer motion handle it
             onClick={handleClick}
@@ -146,17 +146,8 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                 ...style,
                 transform: CSS.Translate.toString(transform),
             }}
-            // Only animate scale/shadow if replaying and active. Do NOT animate transform or layout here.
-            animate={isReplaying && activeEffectCardId === card.id ? {
-                boxShadow: [
-                    "0px 0px 0px 0px rgba(255, 0, 0, 0)",
-                    "0px 0px 0px 8px rgba(255, 0, 0, 0.6)",
-                    "0px 0px 0px 0px rgba(255, 0, 0, 0)"
-                ],
-                scale: [1, 1.05, 1],
-                zIndex: 100 // Ensure highlighted card is on top
-            } : undefined}
-            transition={{ duration: 1.0, repeat: 0, ease: "easeInOut" }}
+            // Transform handled by CSS translation, no separate framer motion animate needed for glow
+            transition={{ duration: 0.2, ease: "easeInOut" }}
         >
             {/* Render Materials Underneath */}
             {!isOverlay && attachedMaterials.length > 0 && attachedMaterials.map((matId, idx) => (
@@ -171,6 +162,12 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                     <Card card={cards[matId]} isOverlay={true} />
                 </div>
             ))}
+
+            {/* Cyber Glitch Effect Element (Rendered on top of materials) */}
+            {isReplaying && activeEffectCardId === card.id && (
+                <div className="cyber-glitch-inner"></div>
+            )}
+
 
             {card.imageUrl ? (
                 <img
