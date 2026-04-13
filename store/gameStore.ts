@@ -3751,8 +3751,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 } else if (actualDestination === 'SPELL_TRAP_ZONE') {
                     const isPendulum = card.subType?.toUpperCase().includes('PENDULUM');
                     const isPZone = toIndex === 0 || toIndex === 4;
+                    const isTrap = card.type === 'TRAP';
                     if (isPendulum && isPZone) {
                         logKey = 'log_pendulum_setting';
+                    } else if (isTrap && determinedFromLocation === 'HAND') {
+                        logKey = 'log_set_card';
                     } else {
                         logKey = 'log_move_to_stz';
                     }
@@ -4818,6 +4821,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         } finally {
             set({ isHistoryBatching: false, isBatching: false });
             get().pushHistory();
+            get().processPendingEffects();
+            get().processUiQueue();
         }
     },
 
@@ -5444,6 +5449,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 drollActive: state.drollActive,
                 nibiruSimulationEnabled: state.nibiruSimulationEnabled,
                 nibiruUsed: state.nibiruUsed,
+                summonCount: state.summonCount,
                 impulseSimulationEnabled: state.impulseSimulationEnabled,
                 impulseUsed: state.impulseUsed,
                 selectedDeckCardId: state.selectedDeckCardId,
