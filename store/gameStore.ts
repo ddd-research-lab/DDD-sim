@@ -165,6 +165,44 @@ export const isCardNegated = (state: any, cardId: string): boolean => {
     return false;
 };
 
+export const isZoneLinkedByMonster = (state: any, mmzIdx: number): boolean => {
+    const occupiedEMZ = state.extraMonsterZones
+        .map((id: string | null, i: number) => ({ id, index: i, type: 'EXTRA_MONSTER_ZONE' }))
+        .filter((x: any) => x.id !== null);
+
+    const occupiedMMZ = state.monsterZones
+        .map((id: string | null, i: number) => ({ id, index: i, type: 'MONSTER_ZONE' }))
+        .filter((x: any) => x.id !== null);
+
+    const linkMonsters = [...occupiedEMZ, ...occupiedMMZ].filter(x => state.cards[x.id!].subType?.includes('LINK'));
+
+    return linkMonsters.some(l => {
+        const card = state.cards[l.id!];
+        const markers: string[] = card.linkMarkers || [];
+        const originType = l.type;
+        const originIdx = l.index;
+
+        return markers.some(m => {
+            let targetMMZ = -1;
+            if (originType === 'EXTRA_MONSTER_ZONE') {
+                if (originIdx === 0) { // Left EMZ
+                    if (m === 'BOTTOM_LEFT') targetMMZ = 0;
+                    if (m === 'BOTTOM') targetMMZ = 1;
+                    if (m === 'BOTTOM_RIGHT') targetMMZ = 2;
+                } else if (originIdx === 1) { // Right EMZ
+                    if (m === 'BOTTOM_LEFT') targetMMZ = 2;
+                    if (m === 'BOTTOM') targetMMZ = 3;
+                    if (m === 'BOTTOM_RIGHT') targetMMZ = 4;
+                }
+            } else if (originType === 'MONSTER_ZONE') {
+                if (m === 'LEFT' && originIdx > 0) targetMMZ = originIdx - 1;
+                if (m === 'RIGHT' && originIdx < 4) targetMMZ = originIdx + 1;
+            }
+            return targetMMZ === mmzIdx;
+        });
+    });
+};
+
 // Strict DD Card identification (includes c034 which is treated as a DD card)
 const isStrictlyDDCard = (card: any): boolean => {
     if (!card) return false;
@@ -2581,20 +2619,42 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter((id: string) => id !== selfId) }));
                         if (choice === 'yes') {
                             if (isNegated) return;
-                            const emptyIndices = store.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
-                            if (emptyIndices.length > 0) {
-                                store.startZoneSelection(formatLog('prompt_select_zone'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: ZoneType, i: number) => {
-                                    useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
-                                    store.addLog(formatLog('log_activate_effect', { card: getCardName(store.cards[selfId], store.language) }));
-                                    store.startTargeting(
-                                        (card: any) => isDDArchetype(card) && (store.monsterZones.includes(card.id) || store.extraMonsterZones.includes(card.id) || store.spellTrapZones.includes(card.id) || store.fieldZone === card.id),
+                            const currentStore = useGameStore.getState();
+
+                            const validEMZ = currentStore.extraMonsterZones
+                                .map((v, i) => (v === null && currentStore.extraMonsterZones[1 - i] === null) ? i : -1)
+                                .filter(i => i !== -1);
+
+                            const validMMZ = currentStore.monsterZones
+                                .map((v, i) => (v === null && isZoneLinkedByMonster(currentStore, i)) ? i : -1)
+                                .filter(i => i !== -1);
+
+                            if (validEMZ.length === 0 && validMMZ.length === 0) {
+                                currentStore.addLog(formatLog('log_no_available_zones'));
+                                return;
+                            }
+
+                            currentStore.startZoneSelection(
+                                formatLog('prompt_select_zone'),
+                                (t: string, i: number) => {
+                                    if (t === 'EXTRA_MONSTER_ZONE') return validEMZ.includes(i);
+                                    if (t === 'MONSTER_ZONE') return validMMZ.includes(i);
+                                    return false;
+                                },
+                                (t: ZoneType, i: number) => {
+                                    const s = useGameStore.getState();
+                                    s.moveCard(selfId, t, i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
+                                    s.addLog(formatLog('log_activate_effect', { card: getCardName(s.cards[selfId], s.language) }));
+                                    s.startTargeting(
+                                        (card: any) => isDDArchetype(card) && (s.monsterZones.includes(card.id) || s.extraMonsterZones.includes(card.id) || s.spellTrapZones.includes(card.id) || s.fieldZone === card.id),
                                         (targetId: string) => {
-                                            store.moveCard(targetId, 'GRAVEYARD');
-                                            store.addLog(formatLog('log_destroy', { card: getCardName(store.cards[targetId], store.language) }));
+                                            const sTarget = useGameStore.getState();
+                                            sTarget.moveCard(targetId, 'GRAVEYARD');
+                                            sTarget.addLog(formatLog('log_destroy', { card: getCardName(sTarget.cards[targetId], sTarget.language) }));
                                         }
                                     );
-                                });
-                            }
+                                }
+                            );
                         }
                     },
                     false,
