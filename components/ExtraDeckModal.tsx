@@ -123,7 +123,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         // 4. Link (Refined for Gilgamesh)
         if (card.subType?.includes('LINK')) {
             const storeState = useGameStore.getState();
-            if (card.cardId === 'c038' || card.cardId === 'c046') {
+            if (card.cardId === 'c038' || card.cardId === 'c046' || card.cardId === 'c047') {
                 const isGilgameshUsed = (storeState.turnEffectUsage['c017'] || 0) > 0;
                 const isZeroKingUsed = (storeState.turnEffectUsage['c034'] || 0) > 0;
                 const isOrthrosHandSSUsed = (storeState.turnEffectUsage['c011_hand_ss'] || 0) > 0;
@@ -131,6 +131,11 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 if (isGilgameshUsed || isZeroKingUsed || isOrthrosHandSSUsed) {
                     return false;
                 }
+            }
+
+            if (card.cardId === 'c047') {
+                // Gravity Controller (c047): 1 non-Link Monster in Extra Monster Zone
+                return storeState.extraMonsterZones.some(id => id !== null && !cards[id]?.subType?.includes('LINK'));
             }
 
             const monsterIds = [...monsterZones, ...storeState.extraMonsterZones].filter((id): id is string => id !== null);
@@ -222,7 +227,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         const card = cards[cardId];
         if (!card) return;
 
-        if (card.cardId === 'c038' || card.cardId === 'c046') {
+        if (card.cardId === 'c038' || card.cardId === 'c046' || card.cardId === 'c047') {
             const storeState = useGameStore.getState();
             const isGilgameshUsed = (storeState.turnEffectUsage['c017'] || 0) > 0;
             const isZeroKingUsed = (storeState.turnEffectUsage['c034'] || 0) > 0;
@@ -237,7 +242,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         if (card.subType?.includes('LINK')) {
             // ... (Link Logic)
             // Gilgamesh Setup
-            const requiredMaterials = 2;
+            const requiredMaterials = card.cardId === 'c047' ? 1 : 2;
 
             // 1. Confirm & Close Modal
             onClose();
@@ -261,6 +266,11 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                     (tCard) => {
                         // Filter
                         if (mats.includes(tCard.id)) return false; // Already selected
+
+                        // Gravity Controller (c047): 1 non-Link Monster in Extra Monster Zone
+                        if (card.cardId === 'c047') {
+                            return extraMonsterZones.includes(tCard.id) && !tCard.subType?.includes('LINK');
+                        }
 
                         // Strict specific logic for Gilgamesh
                         if (card.name.includes('Gilgamesh') && !tCard.name.includes('DD')) return false;
@@ -869,12 +879,23 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                             <div
                                 key={instanceId}
                                 onClick={(e) => {
+                                    const storeState = useGameStore.getState();
+                                    const isGilgameshUsed = (storeState.turnEffectUsage['c017'] || 0) > 0;
+                                    const isZeroKingUsed = (storeState.turnEffectUsage['c034'] || 0) > 0;
+                                    const isOrthrosHandSSUsed = (storeState.turnEffectUsage['c011_hand_ss'] || 0) > 0;
+                                    const isRestrictedLink = (cardId === 'c038' || cardId === 'c046' || cardId === 'c047') && (isGilgameshUsed || isZeroKingUsed || isOrthrosHandSSUsed);
+
+                                    if (isRestrictedLink) {
+                                        storeState.addLog(storeState.language === 'ja'
+                                            ? 'ビルガメス、零王の契約書、またはオルトロスの効果を発動したターン、このカードは特殊召喚できません。'
+                                            : 'Cannot Special Summon this card if the effect of Gilgamesh, Dark Contract with the Zero King, or Orthros was activated this turn.');
+                                        return;
+                                    }
+
                                     // If clicking the card itself (not buttons), trigger summon or select
                                     if (glow) {
                                         handleCardClick(instanceId);
                                     } else {
-                                        // Just select it maybe? or nothing.
-                                        // keeping selection for potential future use or consistency
                                         setSelectedCardId(cardId);
                                     }
                                 }}

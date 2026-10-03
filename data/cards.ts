@@ -559,5 +559,19 @@ export const CARD_DATABASE: { [key: string]: Omit<Card, 'id'> } = {
         level: 0,
         linkMarkers: ['LEFT', 'BOTTOM'],
         imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260824/20260824191206.png'
+    },
+    'c047': {
+        cardId: 'c047',
+        name: 'Gravity Controller',
+        nameJa: 'グラヴィティ・コントローラー',
+        type: 'MONSTER',
+        subType: 'LINK/EFFECT',
+        description: 'Link-1. 1 non-Link Monster in the Extra Monster Zone.',
+        descriptionJa: 'Ｌモンスター以外のＥＸモンスターゾーンのモンスター１体\nこのカードはＬ素材にできない。',
+        attack: 1000,
+        defense: 0,
+        level: 0,
+        linkMarkers: ['BOTTOM_LEFT'],
+        imageUrl: 'https://cdn-ak.f.st-hatena.com/images/fotolife/D/DEYE/20260119/20260119194231.png'
     }
 };

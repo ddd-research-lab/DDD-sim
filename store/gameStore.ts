@@ -115,8 +115,8 @@ const sortExtraDeck = (instanceIds: string[], cards: { [id: string]: Card }): st
         }
 
         if (catA === 3) { // Link
-            // Gilgamesh (c017) then Zeus Ragnarok (c028)
-            const order: { [key: string]: number } = { 'c017': 0, 'c028': 1 };
+            // Gilgamesh (c017) -> Zeus Ragnarok (c028) -> Beyond (c038) -> Deathcaster (c046) -> Gravity Controller (c047)
+            const order: { [key: string]: number } = { 'c017': 0, 'c028': 1, 'c038': 2, 'c046': 3, 'c047': 4 };
             const ordA = order[cardA.cardId] ?? 99;
             const ordB = order[cardB.cardId] ?? 99;
             return ordA - ordB;
@@ -2909,6 +2909,8 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     if (choice === 'yes' && isNegated) { return; }
                     if (isNegated) return;
                     if (choice === 'yes') {
+                        useGameStore.getState().addTurnEffectUsage('c034');
+
                         // Handle activating from hand
                         if (inHand) {
                             const emptyST = store.spellTrapZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
@@ -2924,8 +2926,6 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         store.startTargeting(
                             (c: Card) => fieldTargets.includes(c.id),
                             (tid: string) => {
-                                store.addTurnEffectUsage('c034'); // Record usage at activation
-
                                 if (isNegated) return; // Negation prevents both destruction and SS
 
                                 useGameStore.setState({ lastEffectSourceId: selfId });
@@ -4116,12 +4116,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                         else if (emz0Card.cardId === 'c028') validZones.push(0, 1, 2);
                                         else if (emz0Card.cardId === 'c038') validZones.push(0, 2);
                                         else if (emz0Card.cardId === 'c046') validZones.push(1);
+                                        else if (emz0Card.cardId === 'c047') validZones.push(0);
                                     }
                                     if (emz1Card) {
                                         if (emz1Card.cardId === 'c017') validZones.push(2, 4);
                                         else if (emz1Card.cardId === 'c028') validZones.push(2, 3, 4);
                                         else if (emz1Card.cardId === 'c038') validZones.push(2, 4);
                                         else if (emz1Card.cardId === 'c046') validZones.push(3);
+                                        else if (emz1Card.cardId === 'c047') validZones.push(2);
                                     }
                                     
                                     if (!validZones.includes(toIndex)) {
@@ -4143,6 +4145,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 get().resolveLinkSummon(cardId, [mat1, mat2], toZone, toIndex);
                             }
                         );
+                    }
+                );
+                return; // Abort initial move
+            }
+
+            // Intercept Manual Link Summon - Gravity Controller (c047)
+            // Requirements: 1 non-Link monster in Extra Monster Zone. Link-1.
+            // Constraints: Cannot summon if "Gilgamesh", "Zero King" or "Orthros hand SS" was used this turn.
+            if (!isSpecialSummon && !suppressTrigger && (toZone === 'EXTRA_MONSTER_ZONE' || toZone === 'MONSTER_ZONE') && store.extraDeck.includes(cardId) && cardDef?.cardId === 'c047') {
+                const isGilgameshUsed = (store.turnEffectUsage['c017'] || 0) > 0;
+                const isZeroKingUsed = (store.turnEffectUsage['c034'] || 0) > 0;
+                const isOrthrosHandSSUsed = (store.turnEffectUsage['c011_hand_ss'] || 0) > 0;
+
+                if (isGilgameshUsed || isZeroKingUsed || isOrthrosHandSSUsed) {
+                    store.addLog(store.language === 'ja'
+                        ? 'ビルガメス、零王の契約書、またはオルトロスの効果を発動したターン、このカードは特殊召喚できません。'
+                        : 'Cannot Special Summon this card if the effect of Gilgamesh, Dark Contract with the Zero King, or Orthros was activated this turn.');
+                    return;
+                }
+
+                const emzCandidates = store.extraMonsterZones
+                    .filter((id): id is string => id !== null && !store.cards[id]?.subType?.includes('LINK') && !store.cardFlags[id]?.includes('isHarmoniaPlaced'));
+
+                if (emzCandidates.length < 1) {
+                    store.addLog(store.language === 'ja'
+                        ? 'EXモンスターゾーンにリンクモンスター以外のモンスターが存在しません。'
+                        : 'No non-Link monster in Extra Monster Zone for Link Material.');
+                    return;
+                }
+
+                useGameStore.setState({ isHistoryBatching: true });
+                store.startTargeting(
+                    (c) => store.extraMonsterZones.includes(c.id) && !c.subType?.includes('LINK') && !store.cardFlags[c.id]?.includes('isHarmoniaPlaced'),
+                    (mat1) => {
+                        const s = get();
+                        const materialText = getCardName(s.cards[mat1], s.language);
+                        s.addLog(s.language === 'ja'
+                            ? `素材 [${materialText}] でグラヴィティ・コントローラーをリンク召喚！`
+                            : `Link Summon Gravity Controller using [${materialText}]!`);
+
+                        get().resolveLinkSummon(cardId, [mat1], toZone, toIndex);
                     }
                 );
                 return; // Abort initial move

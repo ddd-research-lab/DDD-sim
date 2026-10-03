@@ -143,6 +143,7 @@ export default function Home() {
     'ダーク・オカルティズム': 'オカルティズム',
     'DDD双暁王カリ・ユガ': 'カリユガ',
     '魔界特派員デスキャスター': 'デスキャスター',
+    'グラヴィティ・コントローラー': 'グラコン',
   };
 
   const applyAbbreviations = (text: string): string => {
