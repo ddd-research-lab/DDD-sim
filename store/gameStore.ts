@@ -2689,7 +2689,109 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         }
     },
 
+    // DDDD Dimensional King Arc Crisis Logic (c029)
+    'c029': (store, selfId, fromLocation, summonVariant, isUsedAsMaterial) => {
+        // [P-Effect] Ignition Effect from P-Zone
+        if (store.spellTrapZones.includes(selfId)) {
+            if (!fromLocation) {
+                const usageKey = 'c029_peffect';
+                if (store.turnEffectUsage[usageKey]) {
+                    store.addLog(formatLog('log_hopt_used', { card: getCardName(store.cards[selfId], store.language) }));
+                    return;
+                }
 
+                // Target: 1 "Dark Contract" ("契約書") card on the field
+                const contractTargets = [
+                    ...store.spellTrapZones.filter((id: string | null): id is string => id !== null),
+                    ...(store.fieldZone ? [store.fieldZone] : [])
+                ].filter((id: string) => {
+                    const card = store.cards[id];
+                    if (!card) return false;
+                    const name = card.name || '';
+                    const nameJa = card.nameJa || '';
+                    return name.includes('Dark Contract') || name.includes('契約書') || nameJa.includes('契約書');
+                });
+
+                if (contractTargets.length === 0) {
+                    store.addLog(formatLog('log_no_targets'));
+                    return;
+                }
+
+                // Check Whitest (c035) in Extra Deck
+                const whitestId = store.extraDeck.find((id: string) => store.cards[id]?.cardId === 'c035');
+                if (!whitestId) {
+                    store.addLog(formatLog('log_error_condition'));
+                    return;
+                }
+
+                store.startTargeting(
+                    (card: any) => contractTargets.includes(card.id),
+                    (targetId: string) => {
+                        const sTarget = useGameStore.getState();
+                        sTarget.addTurnEffectUsage(usageKey, selfId);
+
+                        // Destroy target contract
+                        const targetName = getCardName(sTarget.cards[targetId], sTarget.language);
+                        sTarget.moveCard(targetId, 'GRAVEYARD');
+                        sTarget.addLog(formatLog('log_destroy', { card: targetName }));
+
+                        // Special Summon Whitest (c035) from EX Deck
+                        const sZone = useGameStore.getState();
+                        const validEMZ = sZone.extraMonsterZones
+                            .map((v, i) => v === null ? i : -1)
+                            .filter(i => i !== -1);
+                        const validMMZ = sZone.monsterZones
+                            .map((v, i) => v === null ? i : -1)
+                            .filter(i => i !== -1);
+
+                        if (validEMZ.length === 0 && validMMZ.length === 0) {
+                            sZone.addLog(formatLog('log_no_available_zones'));
+                            return;
+                        }
+
+                        sZone.startZoneSelection(
+                            formatLog('prompt_select_zone'),
+                            (t: string, i: number) => {
+                                if (t === 'EXTRA_MONSTER_ZONE') return validEMZ.includes(i);
+                                if (t === 'MONSTER_ZONE') return validMMZ.includes(i);
+                                return false;
+                            },
+                            (t: ZoneType, i: number) => {
+                                const sSS = useGameStore.getState();
+                                sSS.moveCard(whitestId, t, i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
+                                sSS.addLog(formatLog('log_activate_effect', { card: getCardName(sSS.cards[selfId], sSS.language) }));
+                            }
+                        );
+                    }
+                );
+            }
+            return;
+        }
+
+        // [Monster Effect] Destruction in Monster Zone -> Place in P-Zone
+        if (store.graveyard.includes(selfId) || store.extraDeck.includes(selfId)) {
+            if ((fromLocation === 'MONSTER_ZONE' || fromLocation === 'EXTRA_MONSTER_ZONE') && !isUsedAsMaterial && !store.isMaterialMove && !store.isLinkSummoningActive) {
+                const emptyP: number[] = [];
+                if (store.spellTrapZones[0] === null) emptyP.push(0);
+                if (store.spellTrapZones[4] === null) emptyP.push(4);
+
+                if (emptyP.length > 0) {
+                    store.startEffectSelection(
+                        formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }),
+                        [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
+                        (choice: string) => {
+                            if (choice === 'yes') {
+                                store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyP[0], undefined, false, true, undefined, true);
+                                store.addLog(formatLog('log_place_card', { card: getCardName(store.cards[selfId], store.language) }));
+                            }
+                        },
+                        false,
+                        selfId
+                    );
+                }
+            }
+        }
+    },
 
     // DD Lance Soldier Logic
     // DD Lance Soldier Logic (c032)
@@ -4730,7 +4832,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (isDestruction && !isUsedAsMaterial) {
                     isDestructionEvt = true;
                     if (isDDDOrContract && card.cardId !== 'c030') isDDDOrContractDestroyed = true;
-                    if (card.cardId === 'c029' || card.cardId === 'c035') isArkCrisisDestroyed = true;
+                    if ((card.cardId === 'c029' || card.cardId === 'c035') && (fromLocation === 'MONSTER_ZONE' || fromLocation === 'EXTRA_MONSTER_ZONE')) isArkCrisisDestroyed = true;
                 }
 
                 const isCaesar = card.cardId === 'c022' || card.cardId === 'c023';
@@ -6603,7 +6705,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Trigger Persistence Rule: Activation of other effects does not clear pending triggers.
             if (card && EFFECT_LOGIC[card.cardId]) {
                 const cid = card.cardId;
-                const hoptExempt = ['c021', 'c014', 'c030', 'c032', 'c012', 'c010'];
+                const hoptExempt = ['c021', 'c014', 'c030', 'c032', 'c012', 'c010', 'c029'];
 
                 const usage = get().turnEffectUsage[cid] || 0;
                 const isNegated = isCardNegated(get(), cardId);
