@@ -3026,46 +3026,18 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
             const usageKey = 'c030_ss_reaction';
             if (s.turnEffectUsage[usageKey]) return;
 
-            const { startEffectSelection, startZoneSelection, moveCard, addLog, extraDeck, cards, monsterZones, extraMonsterZones } = s;
+            const { startEffectSelection, startZoneSelection, moveCard, addLog, extraDeck } = s;
             if (!extraDeck.includes(extraDeckId)) return;
 
-            const validZones: { type: any, index: number }[] = [];
-            const emz0Occupied = extraMonsterZones[0] !== null;
-            const emz1Occupied = extraMonsterZones[1] !== null;
+            const validEMZ = s.extraMonsterZones
+                .map((v, i) => (v === null && s.extraMonsterZones[1 - i] === null) ? i : -1)
+                .filter(i => i !== -1);
 
-            // EMZ 1 (Left)
-            if (extraMonsterZones[0] === null && !emz1Occupied) {
-                validZones.push({ type: 'EXTRA_MONSTER_ZONE', index: 0 });
-            } else if (extraMonsterZones[0] !== null) {
-                const occupant = cards[extraMonsterZones[0]!];
-                if (occupant.cardId === 'c017' || occupant.cardId === 'c028' || occupant.cardId === 'c038' || occupant.cardId === 'c046') {
-                    if (occupant.cardId === 'c046') {
-                        if (monsterZones[1] === null) validZones.push({ type: 'MONSTER_ZONE', index: 1 });
-                    } else {
-                        if (monsterZones[0] === null) validZones.push({ type: 'MONSTER_ZONE', index: 0 });
-                        if (monsterZones[2] === null) validZones.push({ type: 'MONSTER_ZONE', index: 2 });
-                        if (occupant.cardId === 'c028' && monsterZones[1] === null) validZones.push({ type: 'MONSTER_ZONE', index: 1 });
-                    }
-                }
-            }
+            const validMMZ = s.monsterZones
+                .map((v, i) => (v === null && isZoneLinkedByMonster(s, i)) ? i : -1)
+                .filter(i => i !== -1);
 
-            // EMZ 2 (Right)
-            if (extraMonsterZones[1] === null && !emz0Occupied) {
-                validZones.push({ type: 'EXTRA_MONSTER_ZONE', index: 1 });
-            } else if (extraMonsterZones[1] !== null) {
-                const occupant = cards[extraMonsterZones[1]!];
-                if (occupant.cardId === 'c017' || occupant.cardId === 'c028' || occupant.cardId === 'c038' || occupant.cardId === 'c046') {
-                    if (occupant.cardId === 'c046') {
-                        if (monsterZones[3] === null) validZones.push({ type: 'MONSTER_ZONE', index: 3 });
-                    } else {
-                        if (monsterZones[2] === null) validZones.push({ type: 'MONSTER_ZONE', index: 2 });
-                        if (monsterZones[4] === null) validZones.push({ type: 'MONSTER_ZONE', index: 4 });
-                        if (occupant.cardId === 'c028' && monsterZones[3] === null) validZones.push({ type: 'MONSTER_ZONE', index: 3 });
-                    }
-                }
-            }
-
-            if (validZones.length === 0) return;
+            if (validEMZ.length === 0 && validMMZ.length === 0) return;
 
             startEffectSelection(
                 formatLog('prompt_zero_machinex_ss'),
@@ -3077,7 +3049,11 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         useGameStore.getState().addTurnEffectUsage(usageKey);
                         startZoneSelection(
                             formatLog('prompt_select_zone_machinex'),
-                            (type: string, index: number) => validZones.some(vz => vz.type === type && vz.index === index),
+                            (type: string, index: number) => {
+                                if (type === 'EXTRA_MONSTER_ZONE') return validEMZ.includes(index);
+                                if (type === 'MONSTER_ZONE') return validMMZ.includes(index);
+                                return false;
+                            },
                             (type: string, index: number) => {
                                 const cardName = getCardName(s.cards[extraDeckId], s.language);
                                 // Skip individual SS log
@@ -3605,6 +3581,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const state = get();
         if (state.effectSelectionState.isOpen || state.targetingState.isOpen || state.searchState.isOpen || state.zoneSelectionState.isOpen || state.isPendulumSummoning) {
             return; // UI is busy
+        }
+
+        if (state.pendingEffects.length > 0) {
+            get().processPendingEffects();
+            return;
         }
 
         // Check Pending Chain
