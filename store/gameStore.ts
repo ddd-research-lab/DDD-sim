@@ -111,7 +111,11 @@ const sortExtraDeck = (instanceIds: string[], cards: { [id: string]: Card }): st
         if (catA <= 2) { // Fusion, Synchro, Xyz
             const valA = cardA.level || cardA.rank || 0;
             const valB = cardB.level || cardB.rank || 0;
-            return valA - valB;
+            if (valA !== valB) return valA - valB;
+
+            const fuA = cardA.faceUp ? 1 : 0;
+            const fuB = cardB.faceUp ? 1 : 0;
+            if (fuA !== fuB) return fuA - fuB;
         }
 
         if (catA === 3) { // Link
@@ -5473,8 +5477,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     addExtraDeckCopy: (cardId: string) => {
         const state = get();
-        // Find an instance with this cardId in extraDeck
-        const existingInstance = state.extraDeck.find(id => state.cards[id].cardId === cardId);
+        // Find an instance with this cardId in extraDeck (or existing cards map)
+        let existingInstance = state.extraDeck.find(id => state.cards[id]?.cardId === cardId);
+        if (!existingInstance) {
+            existingInstance = Object.keys(state.cards).find(id => state.cards[id]?.cardId === cardId);
+        }
         if (!existingInstance) return;
 
         const card = state.cards[existingInstance];
@@ -5487,13 +5494,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const newInstanceId = `inst_${cardId}_${Date.now()}`;
         const newCards = {
             ...state.cards,
-            [newInstanceId]: { ...card, id: newInstanceId }
+            [newInstanceId]: {
+                ...card,
+                id: newInstanceId,
+                faceUp: false,
+                materials: []
+            }
         };
-
-        // Insert after the last instance of this cardId
-        const lastIndex = state.extraDeck.map((id, i) => state.cards[id].cardId === cardId ? i : -1)
-            .filter(i => i >= 0)
-            .pop() ?? state.extraDeck.length - 1;
 
         const newExtraDeck = sortExtraDeck([...state.extraDeck, newInstanceId], newCards);
 
@@ -5522,7 +5529,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (instanceId && instancesToRemove.includes(instanceId)) {
             toRemove = instanceId;
         } else {
-            toRemove = instancesToRemove[instancesToRemove.length - 1]; // Remove last if no specific instance
+            // Prioritize removing a face-down copy if available, so face-up cards sent to EX during duel are kept
+            const faceDownCopy = instancesToRemove.slice().reverse().find(id => !state.cards[id]?.faceUp);
+            toRemove = faceDownCopy || instancesToRemove[instancesToRemove.length - 1];
         }
 
         const card = state.cards[toRemove];
