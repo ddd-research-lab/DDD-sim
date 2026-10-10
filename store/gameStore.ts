@@ -6352,12 +6352,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                         if (val === 'ash_blossom') {
                             const resolveAshBlossom = () => {
-                                set({ ashBlossomUsed: true, showAshBlossomCutIn: true });
+                                set({ ashBlossomUsed: true, showAshBlossomCutIn: true, activeEffectCardId: activatorId || null });
                                 get().addLog(formatLog('log_ash_blossom_negated'));
                                 get().pushHistory(true);
                                 setTimeout(() => {
-                                    set({ showAshBlossomCutIn: false });
-                                    get().pushHistory(true);
+                                    set({ showAshBlossomCutIn: false, activeEffectCardId: null });
                                 }, 1333);
                                 onSelect(options[0].value, true);
                                 get().processUiQueue();
@@ -6374,13 +6373,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                         if (val === 'infinite_impermanence') {
                             const resolveImpermanence = () => {
-                                set({ showInfiniteImpermanenceCutIn: true, infiniteImpermanenceUsed: true });
+                                set({ showInfiniteImpermanenceCutIn: true, infiniteImpermanenceUsed: true, activeEffectCardId: activatorId || null });
                                 const activatorCard = state.cards[activatorId!];
                                 get().addLog(formatLog('log_infinite_impermanence_negated', { card: getCardName(activatorCard, state.language) }));
                                 get().pushHistory(true);
                                 setTimeout(() => {
-                                    set({ showInfiniteImpermanenceCutIn: false });
-                                    get().pushHistory(true);
+                                    set({ showInfiniteImpermanenceCutIn: false, activeEffectCardId: null });
                                 }, 1333);
                                 onSelect(options[0].value, true);
                                 get().processUiQueue();
@@ -6397,13 +6395,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                         if (val === 'impulse') {
                             const resolveImpulse = () => {
-                                set({ showImpulseCutIn: true, impulseUsed: true });
+                                set({ showImpulseCutIn: true, impulseUsed: true, activeEffectCardId: activatorId || null });
                                 const activatorCard = state.cards[activatorId!];
                                 get().addLog(formatLog('log_impulse_negated', { card: getCardName(activatorCard, state.language) }));
                                 get().pushHistory(true);
                                 setTimeout(() => {
-                                    set({ showImpulseCutIn: false });
-                                    get().pushHistory(true);
+                                    set({ showImpulseCutIn: false, activeEffectCardId: null });
                                 }, 1333);
                                 onSelect(options[0].value, true);
                                 if (state.infiniteImpermanenceUsed && activatorId) {
@@ -6423,7 +6420,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                                 setTimeout(() => {
                                     set({ showHarmoniaCutIn: false });
-                                    get().pushHistory(true);
                                 }, 1333);
 
                                 // 1. Target 1 monster on the field to destroy
@@ -7617,22 +7613,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
             });
 
-            if (cutInToTrigger) {
-                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
-                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
-                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
-                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: true });
-                if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
-                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: true });
-
-                await waitReplay(1333);
-
-                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: false });
-                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
-                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
-                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: false });
-                if (cutInToTrigger === "droll") set({ showDrollCutIn: false });
-                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: false });
+            // Skip completely redundant/duplicate history snapshots (same logs, no moves, no cut-in)
+            if (prevSnapshot && currentStepLogCount === prevLogCount && moves.length === 0 && !cutInToTrigger) {
+                prevSnapshot = snapshot;
+                continue;
             }
 
             // Dynamically calculate speed based on current state setting
@@ -7695,12 +7679,90 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 moveGroups = tempGroups;
             }
 
-            // Detect active effect card from log
+            // Detect active effect card from log or snapshot
             let matchedCardId: string | null = null;
             let foundInstanceId: string | null = null;
             let foundZone: any = null;
 
-            if (currentLogs.length > 0) {
+            const abbrevMap: { [key: string]: string[] } = {
+                'c001': ['ケプラー', 'Kepler'],
+                'c002': ['コペルニクス', 'Copernicus'],
+                'c003': ['ニュートン', 'Newton'],
+                'c005': ['地獄門', 'Gate'],
+                'c006': ['魔神王', 'Swamp'],
+                'c007': ['ジンギス', 'Genghis'],
+                'c008': ['カイゼル・ラグナロク', 'Kaiser Ragnarok'],
+                'c009': ['アビス・ラグナロク', 'Abyss Ragnarok'],
+                'c010': ['トーマス', 'Thomas'],
+                'c011': ['オルトロス', 'Orthros'],
+                'c012': ['ケルベロス', 'Cerberus'],
+                'c015': ['リリス', 'Lilith'],
+                'c016': ['ナイト・ハウリング', 'Night Howling'],
+                'c017': ['ギルガメッシュ', 'ビルガメス', '深淵王', 'Gilgamesh'],
+                'c018': ['デスマキナ', 'Deus Machinex', '怒濤大王'],
+                'c019': ['大王テムジン', 'High King Temujin'],
+                'c020': ['大王アレクサンダー', 'High King Alexander'],
+                'c021': ['大王シーザー', 'High King Caesar'],
+                'c022': ['テル', 'Tell'],
+                'c023': ['シーザー', 'Caesar'],
+                'c024': ['テムジン', 'Temujin'],
+                'c025': ['アレクサンダー', 'Alexander'],
+                'c026': ['クロヴィス', 'Krovis'],
+                'c028': ['ゼウス・ラグナロク', 'ゼウス', 'Zeus Ragnarok', 'Zeus'],
+                'c029': ['アーククライシス', 'Ark Crisis'],
+                'c030': ['ゼロ・マキナ', 'ゼロマキナ', 'Zero Machinex', '零死王'],
+                'c031': ['バフォメット', 'Baphomet'],
+                'c032': ['ネクロ・スライム', 'Necro Slime'],
+                'c033': ['スワラル・スライム', 'Swirl Slime'],
+                'c034': ['戦乙女', 'Witch'],
+                'c035': ['白アーマゲドン', 'Bright Armageddon'],
+                'c038': ['軌跡の魔術師', 'ビヨンド', 'Beyond the Pendulum'],
+                'c042': ['スローン', 'Throne'],
+                'c043': ['オカルティズム', 'Occultism'],
+                'c044': ['カリ・ユガ', 'カリユガ', 'Kali Yuga'],
+                'c046': ['デスキャスター', 'Muckraker'],
+                'c047': ['グラヴィティ・コントローラー', 'グラコン', 'Gravity Controller']
+            };
+
+            // Priority 0: Check snapshot.activeEffectCardId if explicitly recorded
+            if (snapshot.activeEffectCardId) {
+                const recordedId = snapshot.activeEffectCardId;
+                const recCard = snapshot.cards?.[recordedId] || get().cards[recordedId];
+                if (recCard) {
+                    matchedCardId = recCard.cardId;
+                    foundInstanceId = recordedId;
+                } else if (recordedId.startsWith('c')) {
+                    matchedCardId = recordedId;
+                }
+            }
+
+            // Priority 0.5: Target detection for Infinite Impermanence negation log
+            if (!matchedCardId && newlyAddedLogs.length > 0) {
+                const impLog = newlyAddedLogs.find(l => l.includes('泡影') || l.includes('Impermanence'));
+                if (impLog) {
+                    const impMatch = impLog.match(/^(.*?)(?:の効果が無効|'s effect was negated)/);
+                    if (impMatch) {
+                        const targetName = impMatch[1].trim();
+                        for (const cId of Object.keys(abbrevMap)) {
+                            if (abbrevMap[cId].some(n => targetName.includes(n))) {
+                                matchedCardId = cId;
+                                break;
+                            }
+                        }
+                        if (!matchedCardId) {
+                            const allCards = snapshot.cards || get().cards;
+                            for (const [id, c] of Object.entries(allCards as { [key: string]: Card })) {
+                                if ((c.nameJa && targetName.includes(c.nameJa)) || (c.name && targetName.includes(c.name))) {
+                                    matchedCardId = c.cardId;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!matchedCardId && currentLogs.length > 0) {
                 const latestLog = currentLogs[currentLogs.length - 1];
                 
                 const getCardIdFromLog = (logText: string, cardsDb: any): string | null => {
@@ -7714,42 +7776,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     if (!hasActivate || hasNegationOrFailure || (isSummonLog && !logText.includes('効果')) || isArkCrisis) {
                         return null;
                     }
-
-                    const abbrevMap: { [key: string]: string[] } = {
-                        'c001': ['ケプラー', 'Kepler'],
-                        'c002': ['コペルニクス', 'Copernicus'],
-                        'c003': ['ニュートン', 'Newton'],
-                        'c005': ['地獄門', 'Gate'],
-                        'c006': ['魔神王', 'Swamp'],
-                        'c007': ['ジンギス', 'Genghis'],
-                        'c008': ['カイゼル・ラグナロク', 'Kaiser Ragnarok'],
-                        'c009': ['アビス・ラグナロク', 'Abyss Ragnarok'],
-                        'c010': ['トーマス', 'Thomas'],
-                        'c011': ['オルトロス', 'Orthros'],
-                        'c012': ['ケルベロス', 'Cerberus'],
-                        'c015': ['リリス', 'Lilith'],
-                        'c016': ['ナイト・ハウリング', 'Night Howling'],
-                        'c017': ['ギルガメッシュ', 'Gilgamesh'],
-                        'c018': ['デスマキナ', 'Deus Machinex'],
-                        'c019': ['大王テムジン', 'High King Temujin'],
-                        'c020': ['大王アレクサンダー', 'High King Alexander'],
-                        'c021': ['大王シーザー', 'High King Caesar'],
-                        'c022': ['テル', 'Tell'],
-                        'c023': ['シーザー', 'Caesar'],
-                        'c024': ['テムジン', 'Temujin'],
-                        'c025': ['アレクサンダー', 'Alexander'],
-                        'c026': ['クロヴィス', 'Krovis'],
-                        'c030': ['デスマキナ', 'Machinex'],
-                        'c031': ['バフォメット', 'Baphomet'],
-                        'c032': ['ネクロ・スライム', 'Necro Slime'],
-                        'c033': ['スワラル・スライム', 'Swirl Slime'],
-                        'c034': ['戦乙女', 'Witch'],
-                        'c035': ['白アーマゲドン', 'Bright Armageddon'],
-                        'c042': ['スローン', 'Throne'],
-                        'c043': ['オカルティズム', 'Occultism'],
-                        'c044': ['カリ・ユガ', 'カリユガ', 'Kali Yuga'],
-                        'c046': ['デスキャスター', 'Muckraker']
-                    };
 
                     // Priority 1: Check if there is an activator card mentioned within parentheses with "effect" or "効果"
                     const parenRegex = /[（\(]([^）\)]*?効果|[^）\)]*?effect)[）\)]/i;
@@ -7803,18 +7829,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 };
 
                 matchedCardId = getCardIdFromLog(latestLog, snapshot.cards || get().cards);
-                if (matchedCardId) {
-                    if (snapshot.spellTrapZones && snapshot.cards) {
-                        for (let idx = 0; idx < snapshot.spellTrapZones.length; idx++) {
-                            const id = snapshot.spellTrapZones[idx];
+            }
+
+            if (matchedCardId && !foundInstanceId) {
+                // If this is Impermanence cut-in, prioritize Monster Zones & EMZ
+                if (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => l.includes('泡影') || l.includes('Impermanence'))) {
+                    if (snapshot.extraMonsterZones && snapshot.cards) {
+                        for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
+                            const id = snapshot.extraMonsterZones[idx];
                             if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
                                 foundInstanceId = id;
-                                foundZone = { type: 'SPELL_TRAP_ZONE', index: idx };
+                                foundZone = { type: 'EXTRA_MONSTER_ZONE', index: idx };
                                 break;
                             }
                         }
                     }
-
                     if (!foundInstanceId && snapshot.monsterZones && snapshot.cards) {
                         for (let idx = 0; idx < snapshot.monsterZones.length; idx++) {
                             const id = snapshot.monsterZones[idx];
@@ -7825,35 +7854,57 @@ export const useGameStore = create<GameStore>((set, get) => ({
                             }
                         }
                     }
+                }
 
-                    if (!foundInstanceId && snapshot.extraMonsterZones && snapshot.cards) {
-                        for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
-                            const id = snapshot.extraMonsterZones[idx];
-                            if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                                foundInstanceId = id;
-                                foundZone = { type: 'EXTRA_MONSTER_ZONE', index: idx };
-                                break;
-                            }
+                if (!foundInstanceId && snapshot.spellTrapZones && snapshot.cards) {
+                    for (let idx = 0; idx < snapshot.spellTrapZones.length; idx++) {
+                        const id = snapshot.spellTrapZones[idx];
+                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
+                            foundInstanceId = id;
+                            foundZone = { type: 'SPELL_TRAP_ZONE', index: idx };
+                            break;
                         }
                     }
+                }
 
-                    if (!foundInstanceId && snapshot.hand && snapshot.cards) {
-                        const inHandId = snapshot.hand.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
-                        if (inHandId) {
-                            foundInstanceId = inHandId;
+                if (!foundInstanceId && snapshot.monsterZones && snapshot.cards) {
+                    for (let idx = 0; idx < snapshot.monsterZones.length; idx++) {
+                        const id = snapshot.monsterZones[idx];
+                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
+                            foundInstanceId = id;
+                            foundZone = { type: 'MONSTER_ZONE', index: idx };
+                            break;
                         }
                     }
+                }
 
-                    if (!foundInstanceId && snapshot.fieldZone && snapshot.cards && (snapshot.cards[snapshot.fieldZone]?.cardId === matchedCardId || get().cards[snapshot.fieldZone]?.cardId === matchedCardId)) {
-                        foundInstanceId = snapshot.fieldZone;
-                        foundZone = { type: 'FIELD_ZONE', index: 0 };
-                    }
-
-                    if (!foundInstanceId && snapshot.graveyard && snapshot.cards) {
-                        const inGraveId = snapshot.graveyard.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
-                        if (inGraveId) {
-                            foundInstanceId = inGraveId;
+                if (!foundInstanceId && snapshot.extraMonsterZones && snapshot.cards) {
+                    for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
+                        const id = snapshot.extraMonsterZones[idx];
+                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
+                            foundInstanceId = id;
+                            foundZone = { type: 'EXTRA_MONSTER_ZONE', index: idx };
+                            break;
                         }
+                    }
+                }
+
+                if (!foundInstanceId && snapshot.hand && snapshot.cards) {
+                    const inHandId = snapshot.hand.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    if (inHandId) {
+                        foundInstanceId = inHandId;
+                    }
+                }
+
+                if (!foundInstanceId && snapshot.fieldZone && snapshot.cards && (snapshot.cards[snapshot.fieldZone]?.cardId === matchedCardId || get().cards[snapshot.fieldZone]?.cardId === matchedCardId)) {
+                    foundInstanceId = snapshot.fieldZone;
+                    foundZone = { type: 'FIELD_ZONE', index: 0 };
+                }
+
+                if (!foundInstanceId && snapshot.graveyard && snapshot.cards) {
+                    const inGraveId = snapshot.graveyard.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    if (inGraveId) {
+                        foundInstanceId = inGraveId;
                     }
                 }
             }
@@ -7901,6 +7952,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 console.log(`[Replay Step ${i}] No moves detected.`);
             }
 
+            // Apply current step snapshot with target card highlighted
             set({
                 ...snapshot,
                 backgroundColor: currentBgColor,
@@ -7920,6 +7972,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 activeReplayInstanceId: foundInstanceId,
                 activeReplayZone: foundZone,
             });
+
+            // Trigger hand trap cut-ins (Impermanence, Ash, etc.) AFTER the monster is placed and highlighted
+            if (cutInToTrigger) {
+                // Short visual cue so user sees the monster activating its effect on field
+                await waitReplay(Math.min(200, currentPauseDuration));
+
+                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
+                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
+                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
+                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: true });
+                if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
+                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: true });
+
+                await waitReplay(1333);
+
+                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: false });
+                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
+                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
+                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: false });
+                if (cutInToTrigger === "droll") set({ showDrollCutIn: false });
+                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: false });
+            }
 
             prevSnapshot = snapshot;
 
