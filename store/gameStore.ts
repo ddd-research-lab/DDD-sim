@@ -2772,29 +2772,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
             return;
         }
 
-        // [Monster Effect] Destruction in Monster Zone -> Place in P-Zone
-        if (store.graveyard.includes(selfId) || store.extraDeck.includes(selfId)) {
-            if ((fromLocation === 'MONSTER_ZONE' || fromLocation === 'EXTRA_MONSTER_ZONE') && !isUsedAsMaterial && !store.isMaterialMove && !store.isLinkSummoningActive) {
-                const emptyP: number[] = [];
-                if (store.spellTrapZones[0] === null) emptyP.push(0);
-                if (store.spellTrapZones[4] === null) emptyP.push(4);
-
-                if (emptyP.length > 0) {
-                    store.startEffectSelection(
-                        formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }),
-                        [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
-                        (choice: string) => {
-                            if (choice === 'yes') {
-                                store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyP[0], undefined, false, true, undefined, true);
-                                store.addLog(formatLog('log_place_card', { card: getCardName(store.cards[selfId], store.language) }));
-                            }
-                        },
-                        false,
-                        selfId
-                    );
-                }
-            }
-        }
+        // [Monster Effect] Destruction in Monster Zone -> Handled in moveCard deferred triggers (isArkCrisisDestroyed)
     },
 
     // DD Lance Soldier Logic
@@ -5042,20 +5020,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         });
                     }
                 }
-                // Ark Crisis P-Zone Placement
+                // Ark Crisis / Bright Armageddon P-Zone Placement
                 if (isArkCrisisDestroyed) {
                     const executeArkCrisis = () => {
                         const freshState = useGameStore.getState();
                         const pZones = [0, 4];
                         const availablePZone = pZones.find(idx => freshState.spellTrapZones[idx] === null);
                         if (availablePZone !== undefined) {
+                            const displayName = movedCard.cardId === 'c029'
+                                ? 'アーククライシス'
+                                : (movedCard.cardId === 'c035' ? '白アーマゲドン' : getCardName(movedCard, freshState.language));
                             freshState.startEffectSelection(
-                                formatLog('prompt_activate_effect', { name: getCardName(movedCard, freshState.language) }),
+                                formatLog('prompt_activate_effect', { name: displayName }),
                                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                                 (choice) => {
                                     if (choice === 'yes') {
-                                        get().moveCard(cardId, 'SPELL_TRAP_ZONE', availablePZone);
-                                        get().addLog(formatLog('log_place_card', { card: getCardName(movedCard, freshState.language) }));
+                                        get().moveCard(cardId, 'SPELL_TRAP_ZONE', availablePZone, undefined, false, true, undefined, true, true);
+                                        const logKey = movedCard.cardId === 'c029'
+                                            ? 'log_arc_crisis_place_pzone'
+                                            : (movedCard.cardId === 'c035' ? 'log_c035_place_pzone' : 'log_place_card');
+                                        get().addLog(formatLog(logKey, { card: displayName }));
+                                        get().pushHistory(true);
                                     }
                                 }
                             );
@@ -7771,7 +7756,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const hasActivate = logText.includes('発動') || logText.includes('Activated') || logText.includes('effect') || logText.includes('効果') || logText.includes('置く') || logText.includes('セット');
                     const hasNegationOrFailure = logText.includes('できません') || logText.includes('満たしていません') || logText.includes('しませんでした') || logText.includes('ないため');
                     const isSummonLog = logText.includes('融合召喚') || logText.includes('S召喚') || logText.includes('X召喚') || logText.includes('リンク召喚') || logText.includes('特殊召喚');
-                    const isArkCrisis = logText.includes('アーククライシス') || logText.includes('c029');
+                    const isArkCrisis = (logText.includes('アーククライシス') || logText.includes('c029')) && !logText.includes('効果');
                     
                     if (!hasActivate || hasNegationOrFailure || (isSummonLog && !logText.includes('効果')) || isArkCrisis) {
                         return null;
