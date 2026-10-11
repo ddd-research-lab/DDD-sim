@@ -33,6 +33,7 @@ import { ReplayCardAnimationOverlay } from '@/components/ReplayCardAnimationOver
 function ReplayLoader() {
   const searchParams = useSearchParams();
   const replayId = searchParams.get('replayId');
+  const step = searchParams.get('step');
   const loadArchive = useGameStore(state => state.loadArchive);
 
   useEffect(() => {
@@ -42,11 +43,19 @@ function ReplayLoader() {
         .then(data => {
           if (data && data.history) {
             loadArchive(data);
+            if (step) {
+              const stepNum = parseInt(step, 10);
+              if (!isNaN(stepNum) && stepNum >= 1) {
+                setTimeout(() => {
+                  useGameStore.getState().jumpToLog(stepNum - 1);
+                }, 50);
+              }
+            }
           }
         })
         .catch(err => console.error('Failed to load replay', err));
     }
-  }, [replayId, loadArchive]);
+  }, [replayId, step, loadArchive]);
 
   return null;
 }

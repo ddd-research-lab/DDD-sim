@@ -115,14 +115,20 @@ export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, us
                 {displayedLogs.map(({ log, displayIndex, originalIndex }, i) => (
                     <div
                         key={i}
-                        onClick={() => !isReplaying && jumpToLog(originalIndex)}
+                        onClick={() => {
+                            if (isReplaying) {
+                                useGameStore.getState().stopReplay();
+                            }
+                            jumpToLog(originalIndex);
+                        }}
                         style={{
                             borderBottom: '1px solid #333',
                             paddingBottom: '2px',
-                            cursor: isReplaying ? 'default' : 'pointer',
-                            opacity: isReplaying ? 0.7 : 1,
+                            cursor: 'pointer',
+                            opacity: 1,
                         }}
-                        className={!isReplaying ? "hover:bg-white/10 hover:text-white transition-colors" : ""}
+                        className="hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        title="クリックしてこの状態にジャンプ"
                     >
                         {displayIndex !== null && <span style={{ color: '#888' }}>[{displayIndex}] </span>}
                         {log}

@@ -3370,6 +3370,8 @@ interface GameStore extends GameState {
     originalZoneOrder: string[] | null; // For GY/Banished display reset
     isHistoryBatching: boolean;
     currentStepIndex: number; // Added for replay functionality
+    historySource?: any[];
+    replayOriginalLogs?: string[] | null;
     language: 'en' | 'ja';
     toggleLanguage: () => void;
     setLanguage: (lang: 'en' | 'ja') => void;
@@ -3623,6 +3625,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     isBatching: false,
     originalZoneOrder: null,
     currentStepIndex: -1,
+    historySource: undefined,
+    replayOriginalLogs: null,
     jumpHistory: [],
     language: 'ja',
     toggleLanguage: () => set((state: any) => ({ language: state.language === 'en' ? 'ja' : 'en' })),
@@ -7285,57 +7289,91 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     jumpToLog: (logIndex: number) => {
         const state = get();
-        const fullHistory = [...(state.history || [])];
+        // If replaying, stop it immediately
+        if (state.isReplaying) {
+            get().stopReplay();
+        }
 
-        // Search for the state where logs.length === logIndex + 1
-        // We look for the FIRST state that satisfies this.
-        const targetState = fullHistory.find(h => h.logs && h.logs.length === logIndex + 1);
+        const freshState = get();
+        const fullHistory = (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].history)
+            ? freshState.jumpHistory[0].history
+            : (freshState.historySource || [...(freshState.history || [])]);
+
+        if (fullHistory.length === 0) {
+            freshState.addLog(formatLog('log_sys_state_not_found'));
+            return;
+        }
+
+        const targetLogNumber = logIndex + 1; // 1-based log target
+
+        // Find the snapshot corresponding to targetLogNumber
+        // 1. Try exact match first: snapshot where log count === targetLogNumber
+        let targetState: any = fullHistory.find(h => {
+            const count = h.logs ? h.logs.length : (h.logCount ?? 0);
+            return count === targetLogNumber;
+        });
+
+        // 2. If not found (e.g. multiple logs were added in a single step), find first snapshot where count >= targetLogNumber
+        if (!targetState) {
+            targetState = fullHistory.find(h => {
+                const count = h.logs ? h.logs.length : (h.logCount ?? 0);
+                return count >= targetLogNumber;
+            });
+        }
+
+        // 3. Fallback: If targetLogNumber is beyond all snapshots, use the last snapshot
+        if (!targetState) {
+            targetState = fullHistory[fullHistory.length - 1];
+        }
 
         if (targetState) {
-            // Check if we are already in a jump?
-            // If so, we should probably append to the existing jumpHistory OR just keeping it implies a stack.
-            // If we jump FROM a jump, we push the current (already reverted) state.
-            // This allows multi-level Return.
+            const historyIndex = fullHistory.indexOf(targetState);
 
-            // Save CURRENT state as a snapshot to jumpHistory
+            // Determine complete logs to preserve
+            const allLogs = freshState.replayOriginalLogs 
+                || (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].logs)
+                || freshState.logs;
+
             const currentSnapshot: Partial<GameState> = {
-                deck: state.deck,
-                hand: state.hand,
-                graveyard: state.graveyard,
-                banished: state.banished,
-                extraDeck: state.extraDeck,
-                monsterZones: [...state.monsterZones],
-                spellTrapZones: [...state.spellTrapZones],
-                fieldZone: state.fieldZone,
-                extraMonsterZones: [...state.extraMonsterZones],
-                lp: state.lp,
-                normalSummonUsed: state.normalSummonUsed,
-                materials: JSON.parse(JSON.stringify(state.materials)),
-                logs: [...state.logs],
-                turnEffectUsage: { ...state.turnEffectUsage },
-                cardFlags: JSON.parse(JSON.stringify(state.cardFlags)),
-                pendulumSummonCount: state.pendulumSummonCount,
-                pendulumSummonLimit: state.pendulumSummonLimit,
-                cardPropertyModifiers: JSON.parse(JSON.stringify(state.cardPropertyModifiers)),
-                isLinkSummoningActive: state.isLinkSummoningActive,
-                isTellBuffActive: state.isTellBuffActive,
-                lastEffectSourceId: state.lastEffectSourceId,
-                activeEffectCardId: state.activeEffectCardId,
-                fieldColor: state.fieldColor,
-                backgroundColor: state.backgroundColor,
-                useGradient: state.useGradient,
-                ashBlossomUsed: state.ashBlossomUsed,
-                infiniteImpermanenceUsed: state.infiniteImpermanenceUsed,
-                history: fullHistory // Save FULL history to restore
+                deck: freshState.deck,
+                hand: freshState.hand,
+                graveyard: freshState.graveyard,
+                banished: freshState.banished,
+                extraDeck: freshState.extraDeck,
+                monsterZones: [...freshState.monsterZones],
+                spellTrapZones: [...freshState.spellTrapZones],
+                fieldZone: freshState.fieldZone,
+                extraMonsterZones: [...freshState.extraMonsterZones],
+                lp: freshState.lp,
+                normalSummonUsed: freshState.normalSummonUsed,
+                materials: JSON.parse(JSON.stringify(freshState.materials)),
+                logs: [...allLogs],
+                turnEffectUsage: { ...freshState.turnEffectUsage },
+                cardFlags: JSON.parse(JSON.stringify(freshState.cardFlags)),
+                pendulumSummonCount: freshState.pendulumSummonCount,
+                pendulumSummonLimit: freshState.pendulumSummonLimit,
+                cardPropertyModifiers: JSON.parse(JSON.stringify(freshState.cardPropertyModifiers)),
+                isLinkSummoningActive: freshState.isLinkSummoningActive,
+                isTellBuffActive: freshState.isTellBuffActive,
+                lastEffectSourceId: freshState.lastEffectSourceId,
+                activeEffectCardId: freshState.activeEffectCardId,
+                fieldColor: freshState.fieldColor,
+                backgroundColor: freshState.backgroundColor,
+                useGradient: freshState.useGradient,
+                ashBlossomUsed: freshState.ashBlossomUsed,
+                infiniteImpermanenceUsed: freshState.infiniteImpermanenceUsed,
+                history: fullHistory
             };
 
-            const historyIndex = fullHistory.indexOf(targetState);
-            const newHistory = fullHistory.slice(0, historyIndex);
+            const newHistory = fullHistory.slice(0, historyIndex >= 0 ? historyIndex : fullHistory.length);
+            const restoredCards = targetState.cards ? { ...freshState.cards, ...targetState.cards } : freshState.cards;
 
             set({
                 ...targetState,
+                cards: restoredCards,
                 history: newHistory,
-                jumpHistory: [...state.jumpHistory, currentSnapshot],
+                historySource: fullHistory,
+                jumpHistory: [...freshState.jumpHistory, currentSnapshot],
                 // Clean UI
                 isDragging: false,
                 activeDragId: null,
@@ -7346,13 +7384,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 modalQueue: [],
                 pendingChain: [],
                 isBatching: false,
-                currentStepIndex: historyIndex, // Set currentStepIndex to the jumped-to index
-                isReplaying: false, // Ensure we are in interactive mode after jump
+                currentStepIndex: historyIndex,
+                isReplaying: false,
+                replayAnimations: null,
+                activeReplayCardId: null,
+                activeReplayInstanceId: null,
+                activeReplayZone: null
             });
             get().addLog(formatLog('log_replay_jump', { index: (logIndex + 1).toString() }));
         } else {
-            // Maybe it's the current state?
-            if (state.logs.length === logIndex + 1) {
+            if (freshState.logs.length === logIndex + 1) {
                 get().addLog(formatLog('log_sys_already_at_step'));
             } else {
                 get().addLog(formatLog('log_sys_state_not_found'));
@@ -7362,13 +7403,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     setReplaySpeed: (speed) => set({ replaySpeed: speed }),
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
-    stopReplay: () => set({
-        isReplaying: false,
-        replayAnimations: null,
-        activeReplayCardId: null,
-        activeReplayInstanceId: null,
-        activeReplayZone: null
-    }),
+    stopReplay: () => {
+        const state = get();
+        set({
+            isReplaying: false,
+            replayAnimations: null,
+            activeReplayCardId: null,
+            activeReplayInstanceId: null,
+            activeReplayZone: null,
+            ...(state.replayOriginalLogs ? { logs: state.replayOriginalLogs, replayOriginalLogs: null } : {})
+        });
+    },
     replay: async (skipSnapshot = false) => {
         // Ensure the latest action is captured in history before starting replay
         if (!skipSnapshot && !get().isHistoryBatching) {
@@ -7386,7 +7431,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Store original logs so we don't accidentally wipe them out during replay steps
         const originalLogs = [...get().logs];
 
-        set({ isReplaying: true, logs: [], currentStepIndex: -1 });
+        set({ isReplaying: true, logs: [], currentStepIndex: -1, replayOriginalLogs: originalLogs });
 
         // Helper: wait specified ms but stop immediately if replay is cancelled
         const waitReplay = (ms: number) => {
@@ -8006,7 +8051,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             replayAnimations: null,
             activeReplayCardId: null,
             activeReplayInstanceId: null,
-            activeReplayZone: null
+            activeReplayZone: null,
+            replayOriginalLogs: null
         });
     },
 
@@ -8060,6 +8106,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
             ...initialState,
             history: history,
+            historySource: history,
+            jumpHistory: [],
             // Ensure derived state / UI is clean
             isReplaying: false,
             currentStepIndex: history.length - 1,

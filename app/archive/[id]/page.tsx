@@ -386,7 +386,10 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
 
                 <div style={{ background: '#222', padding: '15px', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
+                            <span style={{ fontSize: '11px', color: '#888' }}>（クリックでシミュレーターへジャンプ）</span>
+                        </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                                 onClick={() => setUseAbbreviation(!useAbbreviation)}
@@ -467,7 +470,24 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
 
                             return displayLogs.map((item, i) => {
                                 return (
-                                    <div key={i} style={{ borderBottom: '1px solid #333', padding: '2px 0' }}>
+                                    <div
+                                        key={i}
+                                        onClick={() => {
+                                            if (item.index !== null) {
+                                                router.push(`/?replayId=${id}&step=${item.index}`);
+                                            } else {
+                                                router.push(`/?replayId=${id}`);
+                                            }
+                                        }}
+                                        style={{
+                                            borderBottom: '1px solid #333',
+                                            padding: '4px 6px',
+                                            cursor: 'pointer',
+                                            borderRadius: '4px'
+                                        }}
+                                        className="hover:bg-white/10 hover:text-white transition-colors"
+                                        title="シミュレーターでこの手順の状態にジャンプ"
+                                    >
                                         {item.index !== null && (
                                             <span style={{ color: '#888', marginRight: '8px' }}>[{item.index}]</span>
                                         )}
