@@ -1200,7 +1200,12 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const isContract = nameEng.includes('CONTRACT') || nameJa.includes('契約書');
                             return !isContract || c.cardId === 'c034';
                         },
-                        (id: string) => { store.moveCard(id, 'HAND'); },
+                        (id: string) => {
+                            const s = useGameStore.getState();
+                            const cardName = getCardName(s.cards[id], s.language);
+                            s.moveCard(id, 'HAND', undefined, undefined, false, false, undefined, true);
+                            s.addLog(formatLog('log_gryphon_search', { card: cardName }));
+                        }
                     );
                 }
             }, true); // Added canAshBlossom: true

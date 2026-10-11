@@ -241,6 +241,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_lamia_ss': 'ラミアを特殊召喚',
     'log_gryphon_ss': 'グリフォンを特殊召喚',
     'log_gryphon_hand_ss': '{card}を特殊召喚（DDグリフォン効果）',
+    'log_gryphon_search': '{card}をサーチ（DDグリフォン効果）',
     'log_gryphon_p_destroy': '{card}を破壊（DDグリフォン効果）',
     'log_gryphon_psummon_eff': '{discarded}を墓地へ送る&1ドロー（DDグリフォン効果）',
     'log_scale_surveyor_hand_ss': '{card}を特殊召喚（DDスケール・サーベイヤー効果）',
