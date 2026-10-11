@@ -5553,50 +5553,50 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     resetGame: () => {
         const state = get();
-        // Collect all card instances that are NOT in the deck/extraDeck (to return them)
-        // Actually, simpler: return all cards to their initial 'deck' or 'extraDeck' pool.
-        // We know which cards are Extra Deck by their subType.
 
-        const allInstanceIds = Object.keys(state.cards);
-        const newDeck: string[] = [];
-        const newExtraDeck: string[] = [];
+        // 1. Clean cards and enrich with CARD_DATABASE if properties were stripped during compression
+        const newCards: { [id: string]: Card } = {};
+        Object.entries(state.cards).forEach(([id, card]) => {
+            if (!card) return;
+            // Exclude temporary tokens on game reset
+            if (card.cardId === 'c_token_nibiru' || card.type === 'TOKEN') return;
 
-        // We need to maintain the current 'copies' and 'order' of the deck if it wasn't moved.
-        // If the user sorted the deck, we should keep that order.
-        // Strategy: 
-        // 1. Identify all instances currently in Deck.
-        // 2. Identify all instances that WERE in Deck but are now elsewhere (Hand, GY, Field, Materials).
-        // 3. Re-assemble Main Deck: [Current Deck] + [Other Main Deck Instances].
-        // 4. Re-assemble Extra Deck: [All Extra Deck Instances].
+            const dbDef = (card.cardId && CARD_DATABASE[card.cardId]) ? CARD_DATABASE[card.cardId] : null;
+            newCards[id] = {
+                ...(dbDef || {}),
+                ...card,
+                imageUrl: card.imageUrl || dbDef?.imageUrl || dbDef?.image,
+                name: card.name || dbDef?.name || '',
+                nameJa: card.nameJa || dbDef?.nameJa || '',
+                description: card.description || dbDef?.description || '',
+                pendulumEffect: card.pendulumEffect || dbDef?.pendulumEffect || ''
+            };
+        });
 
         const isExtra = (id: string) => {
-            const def = state.cards[id];
+            const def = newCards[id];
             if (!def || !def.subType) return false;
             const st = def.subType.toUpperCase();
             return st.includes('FUSION') || st.includes('SYNCHRO') || st.includes('XYZ') || st.includes('LINK');
         };
 
+        const allInstanceIds = Object.keys(newCards);
         const extraInstances = allInstanceIds.filter(id => isExtra(id));
         const mainInstances = allInstanceIds.filter(id => !isExtra(id));
 
-        // The current 'deck' array in state is the MASTER order for Main Deck.
-        // But some instances might be in Hand/Field/GY.
-        // Let's find all main instances NOT in the current deck array.
-        const offDeckMain = mainInstances.filter(id => !state.deck.includes(id));
-
-        // Final Deck = Current Deck + Off-Deck cards (appended to top/index 0 for simplicity, or just anywhere).
-        // User wants "Deck contents not reset", implying the custom set-up remains.
-        const finalizedDeck = [...offDeckMain, ...state.deck];
+        // Preserve current deck order for existing valid main deck cards, append off-deck main cards
+        const validExistingDeck = (state.deck || []).filter(id => newCards[id] && !isExtra(id));
+        const offDeckMain = mainInstances.filter(id => !validExistingDeck.includes(id));
+        const finalizedDeck = Array.from(new Set([...offDeckMain, ...validExistingDeck]));
 
         // Reset face-up state for all Extra Deck cards to face-down (false)
-        const newCards = { ...state.cards };
         extraInstances.forEach(id => {
             if (newCards[id]) {
                 newCards[id] = { ...newCards[id], faceUp: false };
             }
         });
 
-        const sortedExtraDeck = sortExtraDeck(extraInstances, newCards);
+        const sortedExtraDeck = sortExtraDeck(Array.from(new Set(extraInstances)), newCards);
 
         set({
             cards: newCards,
@@ -5619,10 +5619,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
             cardPropertyModifiers: {},
             selectedDeckCardId: null,
             history: [],
+            historySource: null,
+            jumpHistory: [],
             logs: [],
             isEffectActivated: false,
             currentStepIndex: -1,
             beyondLockActive: false,
+
+            // Replay Clean
+            isReplaying: false,
+            replayAnimations: null,
+            activeReplayCardId: null,
+            activeReplayInstanceId: null,
+            activeReplayZone: null,
+            replayOriginalLogs: null,
+            showPendulumCutIn: false,
+            showHarmoniaCutIn: false,
 
             // Handtraps & Simulation Flags
             ashBlossomUsed: false,

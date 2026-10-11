@@ -117,7 +117,11 @@ export function Board() {
                 <button
                     onClick={() => {
                         resetGame();
-                        router.replace('/');
+                        if (typeof window !== 'undefined' && window.location.search.includes('replayId')) {
+                            window.location.href = '/';
+                        } else {
+                            router.replace('/');
+                        }
                     }}
                     style={{
                         padding: '6px 12px',

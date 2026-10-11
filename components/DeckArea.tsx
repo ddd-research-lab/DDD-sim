@@ -21,6 +21,7 @@ interface SortableCardProps {
 }
 
 function SortableCard({ id, card, index, isSelected, onSelect }: SortableCardProps) {
+  if (!card) return null;
   const {
     attributes,
     listeners,
@@ -222,17 +223,21 @@ export function DeckArea() {
             scrollbarColor: '#ed6c02 transparent'
           }}
         >
-          <SortableContext items={deck} strategy={horizontalListSortingStrategy}>
-            {deck.map((id, index) => (
-              <SortableCard
-                key={id}
-                id={id}
-                card={cards[id]}
-                index={index}
-                isSelected={selectedDeckCardId === id}
-                onSelect={(selected) => setSelectedDeckCardId(selected)}
-              />
-            ))}
+          <SortableContext items={deck.filter(id => Boolean(cards[id]))} strategy={horizontalListSortingStrategy}>
+            {deck.map((id, index) => {
+              const card = cards[id];
+              if (!card) return null;
+              return (
+                <SortableCard
+                  key={id}
+                  id={id}
+                  card={card}
+                  index={index}
+                  isSelected={selectedDeckCardId === id}
+                  onSelect={(selected) => setSelectedDeckCardId(selected)}
+                />
+              );
+            })}
           </SortableContext>
           {deck.length === 0 && (
             <div style={{
