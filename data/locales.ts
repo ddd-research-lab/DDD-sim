@@ -251,6 +251,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_c030_ss_destroy': '{card}を特殊召喚&{target}を破壊（DDD零死王ゼロ・マキナ効果）',
     'log_c030_ss_self_destruct': '{card}を特殊召喚&自壊（DDD零死王ゼロ・マキナ効果）',
     'log_arc_crisis_place_pzone': 'アーククライシスをPゾーンに置く（アーククライシス効果）',
+    'log_arc_crisis_peffect_ss': '白アーマゲドンを特殊召喚（アーククライシス効果：{contract}破壊）',
     'log_c035_place_pzone': '白アーマゲドンをPゾーンに置く（白アーマゲドン効果）',
     'log_caesar_search': '{card}をサーチ（シーザー効果）',
     'log_tell_detach': '{amount}バーン（DDD狙撃王テル効果：コスト・{cost}）',

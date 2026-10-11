@@ -2734,10 +2734,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         const sTarget = useGameStore.getState();
                         sTarget.addTurnEffectUsage(usageKey, selfId);
 
-                        // Destroy target contract
+                        // Destroy target contract (skipLog & suppressHistoryPush to unify into final SS log)
                         const targetName = getCardName(sTarget.cards[targetId], sTarget.language);
-                        sTarget.moveCard(targetId, 'GRAVEYARD');
-                        sTarget.addLog(formatLog('log_destroy', { card: targetName }));
+                        sTarget.moveCard(targetId, 'GRAVEYARD', undefined, undefined, false, false, undefined, true, true);
 
                         // Special Summon Whitest (c035) from EX Deck
                         const sZone = useGameStore.getState();
@@ -2773,8 +2772,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             },
                             (t: ZoneType, i: number) => {
                                 const sSS = useGameStore.getState();
-                                sSS.moveCard(whitestId, t, i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
-                                sSS.addLog(formatLog('log_activate_effect', { card: getCardName(sSS.cards[selfId], sSS.language) }));
+                                sSS.moveCard(whitestId, t, i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT', true, true);
+                                sSS.addLog(formatLog('log_arc_crisis_peffect_ss', { contract: targetName }));
+                                sSS.pushHistory(true);
                             }
                         );
                     }
