@@ -286,6 +286,8 @@ export const LOCALE_JA: { [key: string]: string } = {
     'ui_no': 'いいえ',
     'ui_stop': '停止',
     'ui_replay': 'リプレイ',
+    'ui_replay_from_here': 'この状態から再生',
+    'ui_replay_from_start': '最初から再生',
     'ui_new': '↓新',
     'ui_old': '↑旧',
     'ui_return_jump': '元の状態に戻る',

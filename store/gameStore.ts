@@ -3370,7 +3370,7 @@ interface GameStore extends GameState {
     activeReplayCardId: string | null;
     activeReplayInstanceId: string | null;
     activeReplayZone: { type: ZoneType, index: number } | null;
-    replay: () => void;
+    replay: (startIndex?: number, skipSnapshot?: boolean) => Promise<void>;
     stopReplay: () => void;
     originalZoneOrder: string[] | null; // For GY/Banished display reset
     isHistoryBatching: boolean;
@@ -7419,24 +7419,56 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ...(state.replayOriginalLogs ? { logs: state.replayOriginalLogs, replayOriginalLogs: null } : {})
         });
     },
-    replay: async (skipSnapshot = false) => {
-        // Ensure the latest action is captured in history before starting replay
-        if (!skipSnapshot && !get().isHistoryBatching) {
+    replay: async (startIndex?: number, skipSnapshot = false) => {
+        const state = get();
+        if (state.isReplaying) return;
+
+        // Get complete history
+        const fullHistory = (state.jumpHistory.length > 0 && state.jumpHistory[0].history)
+            ? state.jumpHistory[0].history
+            : (state.historySource || state.history || []);
+
+        if (fullHistory.length === 0) return;
+
+        // Ensure the latest action is captured in history before starting replay if not jumping/replaying
+        if (typeof startIndex !== 'number' && state.currentStepIndex < 0 && !skipSnapshot && !state.isHistoryBatching) {
             get().pushHistory();
         }
 
-        const { history } = get();
-        if (get().isReplaying || history.length === 0) return;
-
         // Store current visual settings to maintain them during replay
-        const currentBgColor = get().backgroundColor;
-        const currentFieldColor = get().fieldColor;
-        const currentUseGradient = get().useGradient;
+        const currentBgColor = state.backgroundColor;
+        const currentFieldColor = state.fieldColor;
+        const currentUseGradient = state.useGradient;
 
         // Store original logs so we don't accidentally wipe them out during replay steps
-        const originalLogs = [...get().logs];
+        const originalLogs = state.replayOriginalLogs
+            || (state.jumpHistory.length > 0 && state.jumpHistory[0].logs)
+            || fullHistory[fullHistory.length - 1]?.logs
+            || [...state.logs];
 
-        set({ isReplaying: true, logs: [], currentStepIndex: -1, replayOriginalLogs: originalLogs });
+        // Determine starting step index
+        let startStep = 0;
+        if (typeof startIndex === 'number') {
+            startStep = Math.max(0, Math.min(startIndex, fullHistory.length - 1));
+        } else if (state.currentStepIndex >= 0 && state.currentStepIndex < fullHistory.length - 1) {
+            startStep = state.currentStepIndex;
+        }
+
+        const isResumingFromMid = startStep > 0;
+        const initialLogCount = isResumingFromMid
+            ? (fullHistory[startStep]?.logCount || fullHistory[startStep]?.logs?.length || 0)
+            : 0;
+        const initialLogs = isResumingFromMid
+            ? originalLogs.slice(0, initialLogCount)
+            : [];
+
+        set({
+            isReplaying: true,
+            logs: initialLogs,
+            currentStepIndex: startStep,
+            replayOriginalLogs: originalLogs,
+            historySource: fullHistory
+        });
 
         // Helper: wait specified ms but stop immediately if replay is cancelled
         const waitReplay = (ms: number) => {
@@ -7567,13 +7599,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
         };
 
         // Track previous state to detect changes
-        let prevPendulumSummonCount = history[0]?.pendulumSummonCount || 0;
-        let prevSnapshot: Partial<any> | null = null;
+        let prevPendulumSummonCount = fullHistory[startStep]?.pendulumSummonCount || 0;
+        let prevSnapshot: Partial<any> | null = isResumingFromMid ? fullHistory[startStep] : null;
 
-        for (let i = 0; i < history.length; i++) {
+        const loopStart = isResumingFromMid ? startStep + 1 : 0;
+
+        for (let i = loopStart; i < fullHistory.length; i++) {
             if (!get().isReplaying) break; // Allow stop
 
-            const snapshot = history[i];
+            const snapshot = fullHistory[i];
             const sZones = snapshot.spellTrapZones;
             const sCount = snapshot.pendulumSummonCount ?? 0;
 
@@ -7985,7 +8019,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                          backgroundColor: currentBgColor,
                          fieldColor: currentFieldColor,
                          useGradient: currentUseGradient,
-                         history: history,
+                         history: fullHistory,
                          isReplaying: true,
                          activeReplayCardId: matchedCardId,
                          activeReplayInstanceId: foundInstanceId,
@@ -8004,7 +8038,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 backgroundColor: currentBgColor,
                 fieldColor: currentFieldColor,
                 useGradient: currentUseGradient,
-                history: history, // Preserve history array in state so it doesn't get lost
+                history: fullHistory, // Preserve history array in state so it doesn't get lost
                 searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },
                 effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null },
                 targetingState: { isOpen: false, filter: null, onSelect: null, mode: 'normal' },
@@ -8057,7 +8091,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
-            replayOriginalLogs: null
+            replayOriginalLogs: null,
+            currentStepIndex: fullHistory.length - 1
         });
     },
 

@@ -93,7 +93,10 @@ export default function Home() {
     logs,
     jumpHistory,
     returnFromJump,
-    activeEffectCardId
+    activeEffectCardId,
+    currentStepIndex,
+    historySource,
+    history
   } = useGameStore();
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [showLog, setShowLog] = useState(true); // Toggle between Log and Preview
@@ -659,25 +662,71 @@ export default function Home() {
                   >
                     📂 {formatLog('ui_archive')}
                   </a>
-                  <button
-                    onClick={() => useGameStore.getState().replay()}
-                    disabled={useGameStore.getState().logs.length === 0}
-                    style={{
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                      backgroundColor: '#4caf50',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      cursor: useGameStore.getState().logs.length === 0 ? 'not-allowed' : 'pointer',
-                      opacity: useGameStore.getState().logs.length === 0 ? 0.5 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    ▶ {formatLog('ui_replay')}
-                  </button>
+                  {(() => {
+                    const fullHistoryList = (jumpHistory.length > 0 && jumpHistory[0].history)
+                      ? jumpHistory[0].history
+                      : (historySource || history || []);
+                    const isAtMidStep = !isReplaying && currentStepIndex >= 0 && currentStepIndex < fullHistoryList.length - 1;
+
+                    return isAtMidStep ? (
+                      <>
+                        <button
+                          onClick={() => replay()}
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            backgroundColor: '#4caf50',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          ▶ {formatLog('ui_replay_from_here')}
+                        </button>
+                        <button
+                          onClick={() => replay(0)}
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            backgroundColor: '#607d8b',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          ⏮ {formatLog('ui_replay_from_start')}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => replay()}
+                        disabled={logs.length === 0}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '11px',
+                          backgroundColor: '#4caf50',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
+                          opacity: logs.length === 0 ? 0.5 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        ▶ {formatLog('ui_replay')}
+                      </button>
+                    );
+                  })()}
                 </>
               )}
 
