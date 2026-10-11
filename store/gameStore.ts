@@ -2741,9 +2741,13 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
 
                         // Special Summon Whitest (c035) from EX Deck
                         const sZone = useGameStore.getState();
-                        const validEMZ = sZone.extraMonsterZones
-                            .map((v, i) => v === null ? i : -1)
-                            .filter(i => i !== -1);
+                        // EMZ Rule: If an EMZ is already occupied (e.g. by a Link Monster), the other EMZ cannot be used
+                        const emzOccupied = sZone.extraMonsterZones[0] !== null || sZone.extraMonsterZones[1] !== null;
+                        const validEMZ = emzOccupied
+                            ? []
+                            : sZone.extraMonsterZones
+                                .map((v, i) => v === null ? i : -1)
+                                .filter(i => i !== -1);
                         const validMMZ = sZone.monsterZones
                             .map((v, i) => v === null ? i : -1)
                             .filter(i => i !== -1);
@@ -2756,8 +2760,15 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         sZone.startZoneSelection(
                             formatLog('prompt_select_zone'),
                             (t: string, i: number) => {
-                                if (t === 'EXTRA_MONSTER_ZONE') return validEMZ.includes(i);
-                                if (t === 'MONSTER_ZONE') return validMMZ.includes(i);
+                                const s = useGameStore.getState();
+                                if (t === 'EXTRA_MONSTER_ZONE') {
+                                    const occupied = s.extraMonsterZones[0] !== null || s.extraMonsterZones[1] !== null;
+                                    if (occupied) return false;
+                                    return s.extraMonsterZones[i] === null;
+                                }
+                                if (t === 'MONSTER_ZONE') {
+                                    return s.monsterZones[i] === null;
+                                }
                                 return false;
                             },
                             (t: ZoneType, i: number) => {
