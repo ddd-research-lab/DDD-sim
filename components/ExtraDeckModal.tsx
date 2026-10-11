@@ -679,7 +679,6 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         });
 
         if (contractCandidates.length === 0) {
-            store.addLog(formatLog('log_alfred_no_contract'));
             return;
         }
 
