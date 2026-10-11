@@ -2243,9 +2243,19 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 return nameEng.includes('CONTRACT') || nameJa.includes('契約書');
             });
 
+            const isTargetCandidate = (id: string) => {
+                const c = store.cards[id];
+                if (!c) return false;
+                if (c.type !== 'MONSTER') return false;
+                const nameEng = (c.name || '').toUpperCase();
+                const nameJa = c.nameJa || '';
+                if (nameEng.includes('CONTRACT') || nameJa.includes('契約書')) return false;
+                return isDDArchetype(c);
+            };
+
             const candidates = hasContractOnField
-                ? [...store.banished, ...store.graveyard].filter((id: string) => isDDArchetype(store.cards[id]))
-                : store.banished.filter((id: string) => isDDArchetype(store.cards[id]));
+                ? [...store.banished, ...store.graveyard].filter(isTargetCandidate)
+                : store.banished.filter(isTargetCandidate);
 
             if (candidates.length === 0) {
                 return;
