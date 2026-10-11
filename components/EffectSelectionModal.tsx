@@ -176,18 +176,20 @@ export function EffectSelectionModal() {
                     {effectOptions.map((opt) => (
                         <button
                             key={opt.value}
-                            onClick={() => resolveEffectSelection(opt.value)}
+                            disabled={opt.disabled}
+                            onClick={() => !opt.disabled && resolveEffectSelection(opt.value)}
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 gap: '10px',
                                 padding: opt.imageUrl ? '10px' : buttonPadding,
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: 'white',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                background: opt.disabled ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)',
+                                color: opt.disabled ? '#777' : 'white',
+                                border: opt.disabled ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid rgba(255, 255, 255, 0.1)',
                                 borderRadius: '12px',
-                                cursor: 'pointer',
+                                cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                                opacity: opt.disabled ? 0.35 : 1,
                                 fontSize: fontSize,
                                 transition: 'background 0.3s, border-color 0.3s, transform 0.3s, box-shadow 0.3s',
                                 textAlign: opt.imageUrl ? 'center' : 'left',
@@ -195,12 +197,14 @@ export function EffectSelectionModal() {
                                 overflow: 'hidden'
                             }}
                             onMouseOver={(e) => {
+                                if (opt.disabled) return;
                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                                 e.currentTarget.style.borderColor = '#10b981';
                                 e.currentTarget.style.transform = 'translateY(-3px)';
                                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(16, 185, 129, 0.3)';
                             }}
                             onMouseOut={(e) => {
+                                if (opt.disabled) return;
                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
                                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                                 e.currentTarget.style.transform = 'translateY(0)';

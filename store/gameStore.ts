@@ -3245,7 +3245,7 @@ interface GameStore extends GameState {
     effectSelectionState: {
         isOpen: boolean;
         title: string;
-        options: { label: string; value: string; imageUrl?: string }[];
+        options: { label: string; value: string; imageUrl?: string; disabled?: boolean }[];
         onSelect: ((value: string) => void) | null;
     };
 
@@ -3306,7 +3306,7 @@ interface GameStore extends GameState {
     resolveXyzSummon: (xyzCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
     resolveLinkSummon: (linkCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
     
-    startEffectSelection: (prompt: string, options: { label: string, value: string }[], onChoice: (val: string, isNegated?: boolean) => void, canAshBlossom?: boolean, activatorId?: string) => void;
+    startEffectSelection: (prompt: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string }[], onChoice: (val: string, isNegated?: boolean) => void, canAshBlossom?: boolean, activatorId?: string) => void;
     resolveEffectSelection: (val: string) => void;
 
     startTargeting: (filter: (card: Card) => boolean, onSelect: (cardId: string) => void, mode?: 'normal' | 'red') => void;
@@ -6254,7 +6254,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
     },
 
-    startEffectSelection: (title: string, options: { label: string, value: string }[], onSelect: (choice: string, isNegated?: boolean) => void, canAshBlossom = false, activatorId?: string) => {
+    startEffectSelection: (title: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string }[], onSelect: (choice: string, isNegated?: boolean) => void, canAshBlossom = false, activatorId?: string) => {
         set({ isEffectActivated: true });
         const execute = () => {
             const currentOptions = [...options];

@@ -457,7 +457,6 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         const gyMonsterIds = store.graveyard.filter(id => store.cards[id]?.type === 'MONSTER');
         const allCandidates = [...fieldMonsterIds, ...gyMonsterIds];
 
-
         const requirements = ['FUSION', 'SYNCHRO', 'XYZ', 'PENDULUM'];
         const selectedMaterials: string[] = [];
         const usedRequirements = new Set<string>();
@@ -471,6 +470,49 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             return false;
         };
 
+        const getDisplayName = (c: CardType) => {
+            if (c.cardId === 'c035') return '白アーマゲドン';
+            if (c.cardId === 'c018') return 'デスマキナ';
+            return getCardName(c, store.language);
+        };
+
+        const getReqLabel = (r: string) => {
+            if (r === 'FUSION') return formatLog('label_fusion');
+            if (r === 'SYNCHRO') return formatLog('label_synchro');
+            if (r === 'XYZ') return formatLog('label_xyz');
+            if (r === 'PENDULUM') return formatLog('label_pendulum');
+            return r;
+        };
+
+        const canSatisfyRemaining = (neededReqs: string[], availableCardIds: string[]): boolean => {
+            if (neededReqs.length === 0) return true;
+            if (availableCardIds.length < neededReqs.length) return false;
+
+            const currentCards = useGameStore.getState().cards;
+            const used = new Set<string>();
+
+            const matchReq = (reqIndex: number): boolean => {
+                if (reqIndex >= neededReqs.length) return true;
+                const req = neededReqs[reqIndex];
+
+                for (const cid of availableCardIds) {
+                    if (!used.has(cid)) {
+                        const card = currentCards[cid];
+                        if (card && canSatisfyReq(card, req)) {
+                            used.add(cid);
+                            if (matchReq(reqIndex + 1)) {
+                                return true;
+                            }
+                            used.delete(cid);
+                        }
+                    }
+                }
+                return false;
+            };
+
+            return matchReq(0);
+        };
+
         const selectNextMaterial = () => {
             if (selectedMaterials.length >= 4) {
                 // All 4 selected, proceed to zone selection
@@ -480,22 +522,28 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
 
             const currentStore = useGameStore.getState();
             const remainingReqs = requirements.filter(r => !usedRequirements.has(r));
-            const reqLabels = remainingReqs.map(r => {
-                if (r === 'FUSION') return formatLog('label_fusion');
-                if (r === 'SYNCHRO') return formatLog('label_synchro');
-                if (r === 'XYZ') return formatLog('label_xyz');
-                if (r === 'PENDULUM') return formatLog('label_pendulum');
-                return r;
-            }).join('/');
 
-
-            // Filter valid candidates
-            const validCandidates = allCandidates.filter(id => {
+            // Available unselected candidates that are DD monsters
+            const availableCandidates = allCandidates.filter(id => {
                 if (selectedMaterials.includes(id)) return false;
                 const card = currentStore.cards[id];
+                if (!card) return false;
                 const hasDD = card.name.includes('DD') || (card.nameJa && card.nameJa.includes('DD'));
-                if (!hasDD) return false;
-                return remainingReqs.some(req => canSatisfyReq(card, req));
+                return !!hasDD;
+            });
+
+            // Filter valid candidates: only cards that can satisfy at least one remaining requirement
+            // AND with which the remaining requirements can still be fully satisfied
+            const validCandidates = availableCandidates.filter(id => {
+                const card = currentStore.cards[id];
+                const cardReqs = remainingReqs.filter(req => canSatisfyReq(card, req));
+                if (cardReqs.length === 0) return false;
+
+                const otherAvailableIds = availableCandidates.filter(cid => cid !== id);
+                return cardReqs.some(req => {
+                    const neededAfter = remainingReqs.filter(r => r !== req);
+                    return canSatisfyRemaining(neededAfter, otherAvailableIds);
+                });
             });
 
             if (validCandidates.length === 0) {
@@ -506,15 +554,30 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                 const selectedCard = currentStore.cards[selectedId];
                 const possibleReqs = remainingReqs.filter(req => canSatisfyReq(selectedCard, req));
 
+                // Sort possibleReqs so PENDULUM comes first as requested:
+                const reqOrder = ['PENDULUM', 'SYNCHRO', 'XYZ', 'FUSION'];
+                possibleReqs.sort((a, b) => reqOrder.indexOf(a) - reqOrder.indexOf(b));
+
                 if (possibleReqs.length === 1) {
                     usedRequirements.add(possibleReqs[0]);
                     selectedMaterials.push(selectedId);
                     currentStore.addSelectedCard(selectedId);
                     selectNextMaterial();
                 } else {
+                    const otherAvailableIds = availableCandidates.filter(cid => cid !== selectedId);
+                    const reqOptions = possibleReqs.map(r => {
+                        const neededAfter = remainingReqs.filter(req => req !== r);
+                        const isSatisfiable = canSatisfyRemaining(neededAfter, otherAvailableIds);
+                        return {
+                            label: getReqLabel(r),
+                            value: r,
+                            disabled: !isSatisfiable
+                        };
+                    });
+
                     currentStore.startEffectSelection(
-                        formatLog('prompt_treat_as', { card: selectedCard.name }),
-                        possibleReqs.map(r => ({ label: r === 'XYZ' ? formatLog('label_xyz') : formatLog('label_pendulum'), value: r })),
+                        formatLog('prompt_treat_as', { card: getDisplayName(selectedCard) }),
+                        reqOptions,
                         (assignedReq) => {
                             usedRequirements.add(assignedReq);
                             selectedMaterials.push(selectedId);
