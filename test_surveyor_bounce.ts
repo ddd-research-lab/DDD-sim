@@ -65,6 +65,23 @@ async function runTest() {
         } else {
             console.log(`SUCCESS: ${target.name} is face-down in Extra Deck.`);
         }
+
+        // --- Also test bouncing from P-Zone (SPELL_TRAP_ZONE 0) ---
+        console.log(`Testing ${target.name} from P-Zone...`);
+        useGameStore.setState({ turnEffectUsage: {} });
+        useGameStore.getState().moveCard(target.id, 'SPELL_TRAP_ZONE', 0);
+        useGameStore.getState().moveCard(surveyor, 'MONSTER_ZONE', 1);
+        useGameStore.getState().moveCard(surveyor, 'GRAVEYARD', undefined, 'MONSTER_ZONE');
+
+        const updatedTargetP = useGameStore.getState().cards[target.id];
+        const inExtraDeckP = useGameStore.getState().extraDeck.includes(target.id);
+        console.log(`P-Zone bounce -> In Extra Deck: ${inExtraDeckP}, faceUp: ${updatedTargetP.faceUp}`);
+        if (!inExtraDeckP || updatedTargetP.faceUp !== false) {
+            console.error(`FAIL: ${target.name} from P-Zone should be face-down in Extra Deck!`);
+            process.exit(1);
+        } else {
+            console.log(`SUCCESS: ${target.name} from P-Zone is face-down in Extra Deck.`);
+        }
     }
 
     console.log("\nALL TESTS PASSED!");

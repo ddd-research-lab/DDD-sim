@@ -1495,8 +1495,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, 'SURVEYOR_BOUNCE', true);
                                         s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
                                     } else if (isExMonster) {
-                                        const bounceVariant = isFromMonsterZone ? 'SURVEYOR_BOUNCE' : undefined;
-                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, bounceVariant, true);
+                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, 'SURVEYOR_BOUNCE', true);
                                         s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
                                     } else {
                                         s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
@@ -2232,9 +2231,10 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
     },
 
     // DDD First King Clovis Logic
-    'c026': (store, selfId, fromLocation) => {
+    'c026': (store, selfId, fromLocation, summonVariant) => {
         // Effect 1: If Synchro Summoned: Target banished "DD". If "Dark Contract" exists, check GY too.
-        if ((store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && fromLocation) {
+        const isSynchro = fromLocation === 'EXTRA_DECK' || summonVariant?.toLowerCase() === 'synchro' || summonVariant?.toLowerCase()?.startsWith('mats:');
+        if ((store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && fromLocation && isSynchro) {
             // Refined check: Specifically look for "Contract" cards on field
             const hasContractOnField = [...store.spellTrapZones, store.fieldZone].some(id => {
                 if (!id) return false;
@@ -5339,6 +5339,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     cancelSearch: () => {
+        get().clearSelectedCards();
         set({ searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined } });
         get().processUiQueue();
     },
@@ -6684,6 +6685,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     cancelZoneSelection: () => {
+        get().clearSelectedCards();
         set({
             zoneSelectionState: { isOpen: false, title: '', filter: null, onSelect: null },
             isHistoryBatching: false,

@@ -473,6 +473,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
         const getDisplayName = (c: CardType) => {
             if (c.cardId === 'c035') return '白アーマゲドン';
             if (c.cardId === 'c018') return 'デスマキナ';
+            if (c.cardId === 'c029') return 'アーククライシス';
             return getCardName(c, store.language);
         };
 
@@ -547,6 +548,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
             });
 
             if (validCandidates.length === 0) {
+                currentStore.clearSelectedCards();
                 return;
             }
 

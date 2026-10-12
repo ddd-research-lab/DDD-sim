@@ -647,7 +647,8 @@ export default function Home() {
               ) : (
                 <>
                   <button
-                    onClick={() => setIsSaveConfirmOpen(true)}
+                    onClick={() => logs.length > 0 && setIsSaveConfirmOpen(true)}
+                    disabled={logs.length === 0}
                     style={{
                       padding: '2px 8px',
                       fontSize: '11px',
@@ -655,7 +656,8 @@ export default function Home() {
                       border: 'none',
                       borderRadius: '4px',
                       color: '#fff',
-                      cursor: 'pointer',
+                      cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
+                      opacity: logs.length === 0 ? 0.5 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px'
