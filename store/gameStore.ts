@@ -1332,12 +1332,13 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     if (!wasBatching) useGameStore.setState({ isBatching: true });
                                     try {
                                         useGameStore.setState({ lastEffectSourceId: selfId });
-                                        store.moveCard(tid1, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                                        store.moveCard(tid1, 'GRAVEYARD', 0, undefined, true, false, undefined, true, true);
                                         useGameStore.setState({ lastEffectSourceId: selfId });
-                                        store.moveCard(tid2, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
+                                        store.moveCard(tid2, 'GRAVEYARD', 0, undefined, true, false, undefined, true, true);
                                     } finally {
                                         if (!wasBatching) {
                                             useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
                                             useGameStore.getState().processPendingEffects();
                                             useGameStore.getState().processUiQueue();
                                         }
@@ -3136,7 +3137,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             (type: string, index: number) => {
                                 const cardName = getCardName(s.cards[extraDeckId], s.language);
                                 // Skip individual SS log
-                                moveCard(extraDeckId, type as any, index, undefined, false, true, undefined, true);
+                                moveCard(extraDeckId, type as any, index, undefined, false, true, undefined, true, true);
                                 
                                 useGameStore.getState().startEffectSelection(
                                     formatLog('prompt_destroy_card'),
@@ -3164,11 +3165,13 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
 
                                                     // Move card with skipLog = true to avoid redundant "Destroyed" log
                                                     moveCard(targetCardId, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
+                                                    useGameStore.getState().pushHistory(true);
                                                 }
                                             );
                                         } else {
                                             // No destruction, just SS log
                                             addLog(formatLog('log_c030_ss', { card: cardName }));
+                                            useGameStore.getState().pushHistory(true);
                                         }
                                     }, false, extraDeckId
                                 );
@@ -7638,7 +7641,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const prevZone = getZoneIdOfCard(prevSnap, cardId);
                     const currZone = getZoneIdOfCard(snapshot, cardId);
                     if (prevZone && currZone && prevZone !== currZone && allCards[cardId]) {
-                        const fromEl = document.querySelector(`[data-card-id="${cardId}"]`);
+                        const fromEl = typeof document !== 'undefined'
+                            ? document.querySelector(`[data-card-id="${cardId}"]`)
+                            : null;
                         const fromRect = fromEl
                             ? fromEl.getBoundingClientRect()
                             : getZoneRect(prevZone);
@@ -7785,6 +7790,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     }
                 }
                 moveGroups = tempGroups;
+
+                // Ensure leaving field (destructions/tributes to GY/EXTRA_DECK/BANISHED) animates BEFORE entering field (summons to MONSTER/STZ)
+                moveGroups.sort((groupA, groupB) => {
+                    const getPriority = (group: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[]) => {
+                        const firstMove = group[0];
+                        if (!firstMove) return 0;
+                        const zone = getZoneIdOfCard(snapshot, firstMove.cardId);
+                        if (!zone) return 0;
+                        if (zone === 'GRAVEYARD' || zone === 'BANISHED' || zone === 'EXTRA_DECK' || zone === 'HAND') {
+                            return 0; // Leaving field comes first
+                        }
+                        return 1; // Entering field comes later
+                    };
+                    return getPriority(groupA) - getPriority(groupB);
+                });
             }
 
             // Detect active effect card from log or snapshot
