@@ -295,6 +295,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'ui_duel_log': 'デュエルログ',
     'ui_total_access': '合計アクセス数',
     'ui_daily_access': '一日のアクセス数',
+    'ui_recent_10_days_avg': '直近10日平均',
 
     // Specific Prompts / Logs
     'log_effect_already_used': '{card}の効果は既にこのターン使用されています',

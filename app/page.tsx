@@ -104,7 +104,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Toggle Sidebar Visibility
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
-  const [analytics, setAnalytics] = useState<{ total: number; daily: number } | null>(null);
+  const [analytics, setAnalytics] = useState<{ total: number; daily: number; recent10Avg?: number } | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [useAbbreviation, setUseAbbreviation] = useState(true);
 
@@ -845,8 +845,9 @@ export default function Home() {
           {analytics && (
             <div style={{
               display: 'flex',
+              flexWrap: 'wrap',
               justifyContent: 'center',
-              gap: '20px',
+              gap: '15px',
               color: 'rgba(255,255,255,0.4)',
               fontSize: '10px',
               fontFamily: 'monospace',
@@ -855,6 +856,9 @@ export default function Home() {
             }}>
               <span>{formatLog('ui_total_access')}: {analytics.total}</span>
               <span>{formatLog('ui_daily_access')}: {analytics.daily}</span>
+              {typeof analytics.recent10Avg === 'number' && (
+                <span>{formatLog('ui_recent_10_days_avg')}: {analytics.recent10Avg}</span>
+              )}
             </div>
           )}
         </div>
