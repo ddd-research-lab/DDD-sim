@@ -268,6 +268,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                     finalState.moveCard(summonId, 'MONSTER_ZONE', zi, 'DECK', false, true, undefined, true);
                                                     finalState.moveCard(selfId, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
                                                     finalState.addLog(formatLog('log_one_for_one_success', { card: summonCardName, cost: costCardName }));
+                                                    finalState.pushHistory(true);
                                                 }
                                             );
                                         } else {
@@ -381,6 +382,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 const cardName = getCardName(useGameStore.getState().cards[selectedId], store.language);
                                 store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
                                 store.addLog(formatLog('log_kepler_added_hand', { card: cardName }));
+                                useGameStore.getState().pushHistory(true);
                             },
                             formatLog('prompt_contract_search'),
                             store.deck
@@ -397,6 +399,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 const cardName = getCardName(useGameStore.getState().cards[targetId], store.language);
                                 store.moveCard(targetId, 'HAND', undefined, undefined, false, false, undefined, true);
                                 store.addLog(formatLog('log_kepler_returned_hand', { card: cardName }));
+                                useGameStore.getState().pushHistory(true);
                             }
                         );
                     }
@@ -450,6 +453,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 useGameStore.getState().moveCard(tid, 'MONSTER_ZONE', i, 'GRAVEYARD', false, true, undefined, true);
                                 store.addLog(formatLog('log_genghis_ss', { card: ssCardName, source: sourceCardName }));
                                 store.addTurnEffectUsage(usageKey, selfId);
+                                useGameStore.getState().pushHistory(true);
                             });
                         }
                     },
@@ -501,16 +505,25 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 materials.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })),
                                 (matId: string) => {
                                     useGameStore.setState({ isBatching: true });
-                                    try {
-                                        store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
-                                        store.addTurnEffectUsage('c044_effect');
+                                    store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
+                                    store.addTurnEffectUsage('c044_effect');
 
-                                        if (isNegated) return;
+                                    if (isNegated) {
+                                        useGameStore.setState({ isBatching: false });
+                                        useGameStore.getState().pushHistory(true);
+                                        useGameStore.getState().processUiQueue();
+                                        return;
+                                    }
 
                                         // Check empty zones again dynamically
                                         const s = useGameStore.getState();
                                         const freshEmpty = s.spellTrapZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
-                                        if (freshEmpty.length === 0) return;
+                                        if (freshEmpty.length === 0) {
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
+                                            useGameStore.getState().processUiQueue();
+                                            return;
+                                        }
 
                                         const freshGY = s.graveyard.filter((id: string) => {
                                             const c = s.cards[id];
@@ -526,7 +539,12 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                 (selectedId: string) => {
                                                     const s2 = useGameStore.getState();
                                                     const currentEmpty = s2.spellTrapZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
-                                                    if (currentEmpty.length === 0) return;
+                                                    if (currentEmpty.length === 0) {
+                                                        useGameStore.setState({ isBatching: false });
+                                                        useGameStore.getState().pushHistory(true);
+                                                        useGameStore.getState().processUiQueue();
+                                                        return;
+                                                    }
 
                                                     s2.startZoneSelection(
                                                         formatLog('prompt_select_zone'),
@@ -535,18 +553,20 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                             const s3 = useGameStore.getState();
                                                             s3.moveCard(selectedId, t as any, i, 'GRAVEYARD', false, true, undefined, true);
                                                             s3.addLog(formatLog('log_c044_effect', { card: getCardName(s3.cards[selectedId], s3.language) }));
+                                                            useGameStore.setState({ isBatching: false });
+                                                            s3.pushHistory(true);
+                                                            s3.processUiQueue();
                                                         }
                                                     );
                                                 },
                                                 formatLog('prompt_select_card'),
                                                 freshGY
                                             );
+                                        } else {
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
+                                            useGameStore.getState().processUiQueue();
                                         }
-                                    } finally {
-                                        useGameStore.setState({ isBatching: false });
-                                        useGameStore.getState().processUiQueue();
-                                        useGameStore.getState().pushHistory();
-                                    }
                                 }
                             );
                         }
@@ -815,12 +835,11 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             s4.addLog(formatLog('log_c046_effect', { target: targetName, discard: discardName }));
                                             
                                             useGameStore.setState({ isHistoryBatching: false });
-                                            s4.pushHistory();
+                                            s4.pushHistory(true);
                                             s4.processUiQueue();
                                         }
                                     );
-                                },
-                                s2.language === 'ja' ? '手札から墓地へ送るカードを選択してください' : 'Select card from Hand to discard'
+                                }
                             );
                         },
                         sSearch.language === 'ja' ? '特殊召喚する「DD」モンスターを選択してください' : 'Select "DD" monster to Special Summon',
@@ -866,6 +885,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             useGameStore.getState().moveCard(tid, 'MONSTER_ZONE', i, 'GRAVEYARD', false, true, undefined, true);
                                             store.addLog(formatLog('log_ragnarok_ss', { card: targetName, source: sourceName }));
                                             store.addTurnEffectUsage(usageKey);
+                                            useGameStore.getState().pushHistory(true);
                                         });
                                     }
                                 },
@@ -923,6 +943,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         if (orthros) {
                                             useGameStore.setState(prev => ({ triggerCandidates: [...prev.triggerCandidates, orthros] }));
                                         }
+                                        useGameStore.getState().pushHistory(true);
                                     });
                                 }
                             },
@@ -951,6 +972,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             store.moveCard(id, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
                             const cardName = getCardName(store.cards[id], store.language);
                             store.addLog(formatLog('log_copernicus_dump', { card: cardName }));
+                            useGameStore.getState().pushHistory(true);
                         },
                         formatLog('prompt_select_card'),
                         store.deck
@@ -1005,9 +1027,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             // 3. Process Batch
                                             console.log('c012 Batch End - Pushing History');
                                             useGameStore.setState({ isBatching: false });
+                                            finalState.pushHistory(true); // Ensure snapshot is saved
                                             finalState.processPendingEffects();
                                             finalState.processUiQueue();
-                                            finalState.pushHistory(); // Ensure snapshot is saved
                                         });
                                     } else {
                                         cs.addLog(formatLog('err_count_surveyor_no_zone'));
@@ -1100,6 +1122,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const cardName = getCardName(s.cards[selfId], s.language);
                             s.moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', false, true, undefined, true);
                             s.addLog(formatLog('log_gryphon_hand_ss', { card: cardName }));
+                            useGameStore.getState().pushHistory(true);
                         });
                     }
                 }
@@ -1235,6 +1258,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             s.moveCard(id, 'HAND', 0, undefined, false, false, undefined, true);
                             s.addLog(formatLog('log_thomas_p_recovery', { card: cardName }));
                             s.addTurnEffectUsage('c010_p', selfId);
+                            s.pushHistory(true);
                         },
                         formatLog('prompt_select_card'),
                         store.extraDeck
@@ -1282,6 +1306,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
 
                                             store.moveCard(deckId, 'MONSTER_ZONE', i, undefined, false, true, undefined, true); // SS skipLog: true
                                             store.addLog(formatLog('log_thomas_ss_eff', { target: summonedCardName, destroyed: destroyedCardName }));
+                                            useGameStore.getState().pushHistory(true);
 
                                             // Resolution complete: process deferred triggers (Surveyor etc.) then end batching
                                             store.processPendingEffects();
@@ -1372,6 +1397,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             useGameStore.getState().moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', true, true, undefined, true);
                             useGameStore.getState().addLog(formatLog('log_orthros_hand_ss'));
                             useGameStore.getState().addTurnEffectUsage('c011_hand_ss', selfId);
+                            useGameStore.getState().pushHistory(true);
                         });
                     } else {
                         currentStore.addLog(formatLog('log_orthros_no_empty_zone'));
@@ -1416,6 +1442,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const cardName = getCardName(s.cards[selfId], s.language);
                             s.moveCard(selfId, 'MONSTER_ZONE', i, 'HAND', false, true, undefined, true);
                             s.addLog(formatLog('log_scale_surveyor_hand_ss', { card: cardName }));
+                            useGameStore.getState().pushHistory(true);
                         });
                     } else {
                         store.addLog(formatLog('log_error_zone'));
@@ -1612,6 +1639,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             const name1 = getCardName(s.cards[selfId], s.language);
                                             const name2 = getCardName(s.cards[matId], s.language);
                                             s.moveCard(fusionId, t as any, i, undefined, false, true, `mats:${name1}＋${name2}`, false);
+                                            useGameStore.getState().pushHistory(true);
                                         }
 
                                     );
@@ -1700,6 +1728,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             // c039 fusion summon log
                                             s.moveCard(fusionId, t as any, i, undefined, false, true, `mats:${name1}＋${name2}`, true);
                                             s.addLog(formatLog('log_typhoon_fusion', { card: getCardName(s.cards[fusionId], s.language) }) + `（${name1}＋${name2}）`);
+                                            useGameStore.getState().pushHistory(true);
                                         }
                                     );
                                 } else {
@@ -1813,6 +1842,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 sFinal.addLog(sFinal.language === 'ja'
                                     ? `${returnedNames.join('＆')}をデッキに戻す（DDリビルド効果）`
                                     : `${returnedNames.join(' & ')} to Deck (DD Rebuild effect)`);
+                                useGameStore.getState().pushHistory(true);
                             } finally {
                                 useGameStore.setState({ isBatching: false });
                                 useGameStore.getState().processUiQueue();
@@ -1882,6 +1912,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
                             store.addLog(formatLog('log_contract_search', { card: searchedCardName }));
                             store.addTurnEffectUsage('c005'); // Maintain original HOPT logic
+                            useGameStore.getState().pushHistory(true);
                         },
                         formatLog('prompt_select_dd_ss')
                     );
@@ -1983,6 +2014,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                 s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}:swamp`);
 
                                                 store.addTurnEffectUsage('c006');
+                                                useGameStore.getState().pushHistory(true);
                                             });
                                         }
                                     },
@@ -2015,7 +2047,6 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         return isOnField && isDDArchetype(c) && c.id !== selfId;
                     },
                     (targetId: string) => {
-                        store.pushHistory();
                         store.addTurnEffectUsage('c028');
                         const targetCard = store.cards[targetId];
                         const targetName = getCardName(targetCard, store.language);
@@ -2024,6 +2055,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         store.incrementPendulumSummonLimit();
 
                         store.addLog(formatLog('log_zeus_extra_p', { card: targetName }));
+                        useGameStore.getState().pushHistory(true);
                     }
                 );
             }
@@ -2048,6 +2080,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const cs = useGameStore.getState();
                             cs.moveCard(selectedId, 'GRAVEYARD', 0, undefined, true, false, undefined, true);
                             cs.addLog(formatLog('log_tell_mill', { card: getCardName(cs.cards[selectedId], cs.language) }));
+                            useGameStore.getState().pushHistory(true);
                         },
                         formatLog('prompt_select_card'),
                         currentStore.deck
@@ -2069,6 +2102,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const costName = getCardName(store.cards[matId], store.language);
                             store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
                             store.addLog(formatLog('log_tell_detach', { amount: '1000', cost: costName }));
+                            useGameStore.getState().pushHistory(true);
 
                             if (store.ftkModeActive) {
                                 const newLp = Math.max(0, useGameStore.getState().opponentLp - 1000);
@@ -2106,6 +2140,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const cardName = getCardName(store.cards[selectedId], store.language);
                             store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
                             store.addLog(formatLog('log_caesar_search', { card: cardName }));
+                            useGameStore.getState().pushHistory(true);
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -2137,6 +2172,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             const cardName = getCardName(store.cards[selectedId], store.language);
                             store.moveCard(selectedId, 'HAND', undefined, undefined, false, false, undefined, true);
                             store.addLog(formatLog('log_caesar_search', { card: cardName }));
+                            useGameStore.getState().pushHistory(true);
                         },
                         formatLog('prompt_contract_search')
                     );
@@ -2193,35 +2229,39 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 materials.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })),
                                 (matId: string) => {
                                     useGameStore.setState({ isBatching: true });
-                                    try {
-                                        store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
-                                        store.addTurnEffectUsage('c025');
+                                    store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
+                                    store.addTurnEffectUsage('c025');
 
-                                        if (isNegated) return; // Detach happened but skip search
-
-                                        if (useGameStore.getState().drollActive) {
-                                            store.addLog(formatLog('log_droll_blocked'));
-                                            return;
-                                        }
-
-                                        store.startSearch(
-                                            (card: any) => {
-                                                const nameJa = card.nameJa || '';
-                                                return nameJa.includes('DD');
-                                            },
-                                            (selectedId: string) => {
-                                                store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
-                                                store.addLog(formatLog('log_solomon_search', { card: getCardName(store.cards[selectedId], store.language) }));
-                                            },
-                                            formatLog('prompt_select_card'),
-                                            store.deck
-                                        );
-
-                                    } finally {
+                                    if (isNegated) {
                                         useGameStore.setState({ isBatching: false });
+                                        useGameStore.getState().pushHistory(true);
                                         store.processUiQueue();
-                                        store.pushHistory();
+                                        return;
                                     }
+
+                                    if (useGameStore.getState().drollActive) {
+                                        store.addLog(formatLog('log_droll_blocked'));
+                                        useGameStore.setState({ isBatching: false });
+                                        useGameStore.getState().pushHistory(true);
+                                        store.processUiQueue();
+                                        return;
+                                    }
+
+                                    store.startSearch(
+                                        (card: any) => {
+                                            const nameJa = card.nameJa || '';
+                                            return nameJa.includes('DD');
+                                        },
+                                        (selectedId: string) => {
+                                            store.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
+                                            store.addLog(formatLog('log_solomon_search', { card: getCardName(store.cards[selectedId], store.language) }));
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
+                                            store.processUiQueue();
+                                        },
+                                        formatLog('prompt_select_card'),
+                                        store.deck
+                                    );
                                 }, false, selfId
                             );
                         }
@@ -2284,6 +2324,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         s2.moveCard(targetId, 'MONSTER_ZONE', i, fromLoc, false, true, undefined, true);
                                         s2.addLog(formatLog('log_clovis_ss', { card: targetName, source: sourceName }));
                                         s2.addTurnEffectUsage('c026');
+                                        useGameStore.getState().pushHistory(true);
                                     });
                                 }
                                 if (emptyIndices.length === 0) {
@@ -2412,6 +2453,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                     (zoneType: ZoneType, zoneIndex: number) => {
                                                         store.moveCard(fusionId, zoneType, zoneIndex, 'EXTRA_DECK', false, true, matsString);
                                                         store.addTurnEffectUsage('c027');
+                                                        useGameStore.getState().pushHistory(true);
                                                     }
                                                 );
                                             },
@@ -2462,6 +2504,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     const finalState = useGameStore.getState();
                                     const names = selectedCards.map(id => getCardName(finalState.cards[id], finalState.language)).join('&');
                                     finalState.addLog(formatLog('log_alfred_placed_multiple', { cards: names }));
+                                    finalState.pushHistory(true);
                                 }
                                 return;
                             }
@@ -2474,6 +2517,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     const finalState = useGameStore.getState();
                                     const names = selectedCards.map(id => getCardName(finalState.cards[id], finalState.language)).join('&');
                                     finalState.addLog(formatLog('log_alfred_placed_multiple', { cards: names }));
+                                    finalState.pushHistory(true);
                                 }
                                 return;
                             }
@@ -2558,6 +2602,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             s3.changeLP(-1000);
                                             useGameStore.setState({ isTellBuffActive: true });
                                             s3.addLog(formatLog('log_gilgamesh_p_place_damage', { card1: nameA, card2: nameB, amount: '1000' }));
+                                            useGameStore.getState().pushHistory(true);
 
                                             // Trigger Orthros (c011) if in Hand
                                             const orthros = s3.hand.find((id: string) => s3.cards[id].cardId === 'c011');
@@ -2617,6 +2662,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     // Set Source ID right before each move to ensure Machinex sees it
                                     useGameStore.setState({ lastEffectSourceId: selfId });
                                     store.addLog(formatLog('log_zero_machinex_set_contract', { card: placedCardName }));
+                                    useGameStore.getState().pushHistory(true);
                                 });
                             },
                             formatLog('prompt_contract_search'),
@@ -2666,12 +2712,14 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     const s = useGameStore.getState();
                                     s.moveCard(selfId, t, i, 'EXTRA_DECK', false, true, 'SPECIAL_SUMMON_EFFECT');
                                     s.addLog(formatLog('log_activate_effect', { card: getCardName(s.cards[selfId], s.language) }));
+                                    s.pushHistory(true);
                                     s.startTargeting(
                                         (card: any) => isDDArchetype(card) && (s.monsterZones.includes(card.id) || s.extraMonsterZones.includes(card.id) || s.spellTrapZones.includes(card.id) || s.fieldZone === card.id),
                                         (targetId: string) => {
                                             const sTarget = useGameStore.getState();
                                             sTarget.moveCard(targetId, 'GRAVEYARD');
                                             sTarget.addLog(formatLog('log_destroy', { card: getCardName(sTarget.cards[targetId], sTarget.language) }));
+                                            sTarget.pushHistory(true);
                                         }
                                     );
                                 }
@@ -2840,7 +2888,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                             const amount = parseInt(val);
                                             store.modifyCardProperty(targetId, 'level', amount, 'add');
                                             store.addLog(formatLog('log_lance_soldier_level_up', { card: getCardName(store.cards[targetId], store.language), amount: amount.toString() }));
-                                            useGameStore.getState().pushHistory();
+                                            useGameStore.getState().pushHistory(true);
                                         }, false, selfId);
                                     }
                                 );
@@ -2875,39 +2923,40 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             (targetId: string) => {
                                 // Use batching to ensure Lance Soldier SS happens before Zero Machinex trigger popped by moveCard
                                 useGameStore.setState({ isBatching: true });
-                                try {
-                                    useGameStore.setState({ lastEffectSourceId: selfId });
-                                    const sourceName = getCardName(store.cards[selfId], store.language);
-                                    const targetName = getCardName(store.cards[targetId], store.language);
+                                useGameStore.setState({ lastEffectSourceId: selfId });
+                                const sourceName = getCardName(store.cards[selfId], store.language);
+                                const targetName = getCardName(store.cards[targetId], store.language);
 
-                                    store.moveCard(targetId, 'GRAVEYARD', 0, undefined, false, false, undefined, true); // skipLog: true
+                                store.moveCard(targetId, 'GRAVEYARD', 0, undefined, false, false, undefined, true); // skipLog: true
 
-                                    const currentStore = useGameStore.getState();
-                                    const emptyIndices = currentStore.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
-                                    if (emptyIndices.length > 0) {
-                                        store.startZoneSelection(
-                                            formatLog('prompt_select_zone_ss'),
-                                            (type: string, index: number) => type === 'MONSTER_ZONE' && emptyIndices.includes(index),
-                                            (type: ZoneType, index: number) => {
-                                                useGameStore.getState().moveCard(selfId, type, index, 'GRAVEYARD', false, true, undefined, true); // skipLog: true
-                                                if (store.setCardFlag) {
-                                                    store.setCardFlag(selfId, 'BANISH_ON_LEAVE');
-                                                }
-                                                // Add unified log after move
-                                                store.addLog(formatLog('log_lance_ss_destroy', {
-                                                    card: sourceName,
-                                                    source: sourceName,
-                                                    target: targetName
-                                                }));
+                                const currentStore = useGameStore.getState();
+                                const emptyIndices = currentStore.monsterZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
+                                if (emptyIndices.length > 0) {
+                                    store.startZoneSelection(
+                                        formatLog('prompt_select_zone_ss'),
+                                        (type: string, index: number) => type === 'MONSTER_ZONE' && emptyIndices.includes(index),
+                                        (type: ZoneType, index: number) => {
+                                            useGameStore.getState().moveCard(selfId, type, index, 'GRAVEYARD', false, true, undefined, true); // skipLog: true
+                                            if (store.setCardFlag) {
+                                                store.setCardFlag(selfId, 'BANISH_ON_LEAVE');
                                             }
-                                        );
-                                    } else {
-                                        store.addLog(formatLog('log_error_condition'));
-                                    }
-                                } finally {
+                                            // Add unified log after move
+                                            store.addLog(formatLog('log_lance_ss_destroy', {
+                                                card: sourceName,
+                                                source: sourceName,
+                                                target: targetName
+                                            }));
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
+                                            useGameStore.getState().processPendingEffects();
+                                            useGameStore.getState().processUiQueue();
+                                        }
+                                    );
+                                } else {
+                                    store.addLog(formatLog('log_error_condition'));
                                     useGameStore.setState({ isBatching: false });
-                                    store.processUiQueue();
-                                    store.pushHistory();
+                                    useGameStore.getState().pushHistory(true);
+                                    useGameStore.getState().processUiQueue();
                                 }
                             }
                         );
@@ -2969,6 +3018,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 store.moveCard(targetId, 'MONSTER_ZONE', i, undefined, false, true, undefined, true);
                                 store.addLog(formatLog('log_defense_soldier_ss_pzone', { card: cardName }));
                                 store.addTurnEffectUsage('c033_p_ss');
+                                useGameStore.getState().pushHistory(true);
                             });
                         } else {
                             store.addLog(formatLog('log_error_condition'));
@@ -3010,6 +3060,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         store.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true);
                         store.addLog(formatLog('log_defense_soldier_recovery', { card: cardName }));
                         store.addTurnEffectUsage('c033_gy_search');
+                        useGameStore.getState().pushHistory(true);
                     },
                     formatLog('prompt_select_dd_p'),
                     uniqueTargets // Pass PRE-FILTERED list to SearchModal source to avoid searching whole deck
@@ -3068,6 +3119,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             (tid: string) => {
                                 if (isNegated) return; // Negation prevents both destruction and SS
 
+                                useGameStore.setState({ isBatching: true });
                                 useGameStore.setState({ lastEffectSourceId: selfId });
                                 const targetCardName = getCardName(store.cards[tid], store.language);
                                 store.moveCard(tid, 'GRAVEYARD', 0, undefined, false, false, undefined, true);
@@ -3083,7 +3135,16 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                 const ssCardName = getCardName(currentStore.cards[sid], currentStore.language);
                                                 store.moveCard(sid, 'MONSTER_ZONE', i, 'DECK', false, true, undefined, true);
                                                 store.addLog(formatLog('log_c034_destroy_and_ss', { cardA: targetCardName, cardB: ssCardName }));
+                                                useGameStore.setState({ isBatching: false });
+                                                useGameStore.getState().pushHistory(true);
+                                                useGameStore.getState().processPendingEffects();
+                                                useGameStore.getState().processUiQueue();
                                             });
+                                        } else {
+                                            useGameStore.setState({ isBatching: false });
+                                            useGameStore.getState().pushHistory(true);
+                                            useGameStore.getState().processPendingEffects();
+                                            useGameStore.getState().processUiQueue();
                                         }
                                     },
                                     formatLog('prompt_select_dd_ss'),
@@ -3250,7 +3311,7 @@ interface GameStore extends GameState {
     clearSelectedCards: () => void;
 
     // History Actions
-    pushHistory: () => void;
+    pushHistory: (force?: boolean) => void;
     undo: () => void;
 
     // Actions
@@ -5549,17 +5610,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         Object.entries(state.cards).forEach(([id, card]) => {
             if (!card) return;
             // Exclude temporary tokens on game reset
-            if (card.cardId === 'c_token_nibiru' || card.type === 'TOKEN') return;
+            if (card.cardId === 'c_token_nibiru' || (card.type as any) === 'TOKEN') return;
 
             const dbDef = (card.cardId && CARD_DATABASE[card.cardId]) ? CARD_DATABASE[card.cardId] : null;
             newCards[id] = {
                 ...(dbDef || {}),
                 ...card,
-                imageUrl: card.imageUrl || dbDef?.imageUrl || dbDef?.image,
+                imageUrl: card.imageUrl || dbDef?.imageUrl,
                 name: card.name || dbDef?.name || '',
                 nameJa: card.nameJa || dbDef?.nameJa || '',
-                description: card.description || dbDef?.description || '',
-                pendulumEffect: card.pendulumEffect || dbDef?.pendulumEffect || ''
+                description: card.description || dbDef?.description || ''
             };
         });
 
@@ -5609,7 +5669,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             cardPropertyModifiers: {},
             selectedDeckCardId: null,
             history: [],
-            historySource: null,
+            historySource: undefined,
             jumpHistory: [],
             logs: [],
             isEffectActivated: false,
@@ -5633,7 +5693,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
             drollActive: false,
             showDrollCutIn: false,
             harmoniaUsed: false,
-            showHarmoniaCutIn: false,
             infiniteImpermanenceUsed: false,
             showInfiniteImpermanenceCutIn: false,
             nibiruUsed: false,
@@ -6085,7 +6144,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             get().moveCard(synchroCardId, toZoneType, toZoneIndex, 'EXTRA_DECK', false, true, `mats:${tunerName}＋${nonTunerNames}`, false, true);
         } finally {
             set({ isHistoryBatching: false, isBatching: false });
-            get().pushHistory();
+            get().pushHistory(true);
             get().processPendingEffects();
             get().processUiQueue();
         }
@@ -6114,7 +6173,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         } finally {
             set({ isHistoryBatching: false, isBatching: false });
             // 3. Manually push history ONCE after all moves are complete
-            get().pushHistory();
+            get().pushHistory(true);
             
             // Allow React to render Beyond on the field before starting the dialog UI queue
             setTimeout(() => {
@@ -6185,7 +6244,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         } finally {
             set({ isHistoryBatching: false, isBatching: false });
-            get().pushHistory();
+            get().pushHistory(true);
         }
 
         // Trigger check: Temujin (c007/c019) and Ragnarok P-effect (c008)
@@ -6799,7 +6858,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                 finalState.addLog(formatLog('log_tribute_summon', { card: getCardName(card, finalState.language) }));
 
                                                 useGameStore.setState({ isBatching: false, isHistoryBatching: false });
-                                                get().pushHistory();
+                                                get().pushHistory(true);
                                                 finalState.processPendingEffects();
                                                 finalState.processUiQueue();
                                             });
@@ -7113,6 +7172,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                                     sFinal.addLog(sFinal.language === 'ja'
                                                                         ? `${name1}＆${name2}を破壊（ビヨンド効果）`
                                                                         : `Destroyed ${name1} & ${name2} (Beyond effect)`);
+                                                                    sFinal.pushHistory(true);
                                                                 }
                                                             );
                                                         }
@@ -7131,9 +7191,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         }
                     }
                 } finally {
-                    get().processPendingEffects();
                     set({ isBatching: false, isHistoryBatching: false, isPendulumProcessing: false });
-                    get().pushHistory();
+                    get().pushHistory(true);
+                    get().processPendingEffects();
+                    get().processUiQueue();
                 }
                 return;
             }
@@ -8018,7 +8079,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 if (!foundInstanceId && snapshot.hand && snapshot.cards) {
-                    const inHandId = snapshot.hand.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    const inHandId = snapshot.hand.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
                     if (inHandId) {
                         foundInstanceId = inHandId;
                     }
@@ -8030,7 +8091,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 if (!foundInstanceId && snapshot.graveyard && snapshot.cards) {
-                    const inGraveId = snapshot.graveyard.find((id) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    const inGraveId = snapshot.graveyard.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
                     if (inGraveId) {
                         foundInstanceId = inGraveId;
                     }

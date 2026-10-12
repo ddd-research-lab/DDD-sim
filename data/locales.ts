@@ -473,8 +473,6 @@ export const LOCALE_JA: { [key: string]: string } = {
     'prompt_zeus_negate_cost_dd': 'コストとして除外する「DD」モンスターを選択してください。',
     'log_zeus_negate_success': '{cost1}と{cost2}を除外して{target}を無効（DDD天空王ゼウス・ラグナロク効果）',
     'prompt_save_to_archive_confirm': 'ルート倉庫に保存しますか？',
-    'ui_yes': 'はい',
-    'ui_no': 'いいえ',
 };
 
 export const formatLog = (key: string, params: { [key: string]: string } = {}): string => {
