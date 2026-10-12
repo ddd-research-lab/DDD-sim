@@ -6413,13 +6413,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 }
                                 get().processUiQueue();
                             };
-                            resolveImpulse();
+                            const negateImpulse = () => {
+                                set({ impulseUsed: true }); // Activate, but negated
+                                get().pushHistory(true);
+                                onSelect(options[0].value, false);
+                                get().processUiQueue();
+                            };
+                            performZeusCheck(resolveImpulse, negateImpulse, '霊王の波動', 'Dominus Impulse');
                             return;
                         }
 
                         if (val === 'harmonia') {
                             const resolveHarmonia = () => {
                                 set({ showHarmoniaCutIn: true, harmoniaUsed: true });
+                                get().addLog(formatLog('log_harmonia_activated'));
                                 get().pushHistory(true);
 
                                 setTimeout(() => {
@@ -6437,9 +6444,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                     (targetId: string) => {
                                         const s = get();
                                         const targetName = getCardName(s.cards[targetId], s.language);
-                                        s.moveCard(targetId, 'GRAVEYARD');
                                         s.addLog(s.language === 'ja' ? `${targetName}を破壊（ハルモニア効果）` : `Destroyed "${targetName}" (Harmonia effect)`);
-                                        s.pushHistory(true);
+                                        s.moveCard(targetId, 'GRAVEYARD');
 
                                         // 2. Queue the Harmonia extra effect to be resolved AFTER the main effect (e.g. search) completes
                                         const triggerHarmoniaExtra = () => {
@@ -7679,28 +7685,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const currentStepLogCount = snapshot.logCount || 0;
             const newlyAddedLogs = chronologicalLogs.slice(prevLogCount, currentStepLogCount);
 
+            const isZeusNegate = (l: string) => l.includes("天空王ゼウス") || l.includes("Zeus Ragnarok");
+
             let cutInToTrigger: string | null = null;
             newlyAddedLogs.forEach(l => {
-                if (l.includes("灰流うらら") || l.includes("Ash Blossom")) {
+                if ((l.includes("灰流うらら") || l.includes("Ash Blossom")) && !isZeusNegate(l)) {
                     cutInToTrigger = "ash";
-                } else if (l.includes("泡影") || l.includes("Impermanence")) {
+                } else if ((l.includes("泡影") || l.includes("Impermanence")) && !isZeusNegate(l)) {
                     cutInToTrigger = "impermanence";
-                } else if (l.includes("霊王の波動") || l.includes("Dominus Impulse")) {
+                } else if ((l.includes("霊王の波動") || l.includes("Dominus Impulse")) && !isZeusNegate(l) && !l.includes("破壊されました") && !l.includes("destroyed")) {
                     cutInToTrigger = "impulse";
                 } else if ((l.includes("ニビル") || l.includes("Nibiru")) && !l.includes("無効") && !l.includes("negate")) {
                     cutInToTrigger = "nibiru";
-                } else if (l.includes("ドロール") || l.includes("Droll")) {
+                } else if ((l.includes("ドロール") || l.includes("Droll")) && !l.includes("発動できません") && !l.includes("cannot be activated")) {
                     cutInToTrigger = "droll";
-                } else if (l.includes("ハルモニア効果") || l.includes("Harmonia effect")) {
-                    cutInToTrigger = "harmonia";
+                } else if (!isZeusNegate(l) && !l.includes("バウンス") && !l.includes("魔法・罠ゾーンに置く")) {
+                    if (l.includes("調和ノ天救竜を発動") || l.includes("activated Harmonia")) {
+                        cutInToTrigger = "harmonia";
+                    } else if ((l.includes("ハルモニア効果") || l.includes("Harmonia effect")) && !chronologicalLogs.slice(0, currentStepLogCount).some(x => x !== l && (x.includes("調和ノ天救竜を発動") || x.includes("activated Harmonia")))) {
+                        cutInToTrigger = "harmonia";
+                    }
                 }
             });
 
-            // Trigger Nibiru cut-in BEFORE monsters are moved/wiped from field (meteor crashes before board wipe)
+            // Trigger Nibiru or Harmonia cut-in BEFORE monsters are moved/wiped from field (visual meteor or dragon appearance before destruction)
             if (cutInToTrigger === "nibiru") {
                 set({ showNibiruCutIn: true });
                 await waitReplay(1333);
                 set({ showNibiruCutIn: false });
+                cutInToTrigger = null; // Consumed so it does not trigger again after moves
+            } else if (cutInToTrigger === "harmonia") {
+                set({ showHarmoniaCutIn: true });
+                await waitReplay(1333);
+                set({ showHarmoniaCutIn: false });
                 cutInToTrigger = null; // Consumed so it does not trigger again after moves
             }
 
@@ -7924,7 +7941,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (matchedCardId && !foundInstanceId) {
                 // If this is Impermanence cut-in, prioritize Monster Zones & EMZ
-                if (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => l.includes('泡影') || l.includes('Impermanence'))) {
+                if (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => (l.includes('泡影') || l.includes('Impermanence')) && !isZeusNegate(l))) {
                     if (snapshot.extraMonsterZones && snapshot.cards) {
                         for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
                             const id = snapshot.extraMonsterZones[idx];
@@ -8073,7 +8090,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
                 if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
-                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: true });
 
                 await waitReplay(1333);
 
@@ -8081,7 +8097,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
                 if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: false });
-                if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: false });
             }
 
             prevSnapshot = snapshot;

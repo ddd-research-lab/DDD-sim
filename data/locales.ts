@@ -465,6 +465,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_impulse_destroyed': '相手の霊王の波動の効果で{card}は破壊されました',
     'log_nibiru_activated': '原始生命態ニビルの効果を発動！フィールドのモンスターを全てリリースし、このカードを特殊召喚。相手フィールドにトークンを特殊召喚',
     'log_nibiru_simplified': '相手がニビルを発動',
+    'log_harmonia_activated': '相手が調和ノ天救竜を発動',
     'log_zeus_negation': '{zeus}の効果を発動！{card}の発動を無効にし除外',
     'ui_zeus_negate': 'ラグナロクで無効',
     'prompt_zeus_negate_cost_contract': 'コストとして除外する「契約書」カードを選択してください。',
