@@ -26,6 +26,7 @@ import { Card as CardType, ZoneType } from '@/types';
 import { DeckArea } from '@/components/DeckArea';
 import { EffectSelectionModal } from '@/components/EffectSelectionModal';
 import { ShareModal } from '@/components/ShareModal';
+import { SaveConfirmModal } from '@/components/SaveConfirmModal';
 import { formatLog } from '@/data/locales';
 import { SimToggles } from '@/components/SimToggles';
 import { ReplayCardAnimationOverlay } from '@/components/ReplayCardAnimationOverlay';
@@ -102,6 +103,7 @@ export default function Home() {
   const [showLog, setShowLog] = useState(true); // Toggle between Log and Preview
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Toggle Sidebar Visibility
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
   const [analytics, setAnalytics] = useState<{ total: number; daily: number } | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [useAbbreviation, setUseAbbreviation] = useState(true);
@@ -644,6 +646,24 @@ export default function Home() {
                 </button>
               ) : (
                 <>
+                  <button
+                    onClick={() => setIsSaveConfirmOpen(true)}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      backgroundColor: '#9C27B0',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title={formatLog('ui_save')}
+                  >
+                    💾 {formatLog('ui_save')}
+                  </button>
                   <a
                     href="/archive"
                     style={{
@@ -867,6 +887,11 @@ export default function Home() {
 
         <EffectSelectionModal />
         <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+        <SaveConfirmModal
+          isOpen={isSaveConfirmOpen}
+          onClose={() => setIsSaveConfirmOpen(false)}
+          onConfirm={() => setIsShareModalOpen(true)}
+        />
 
         <DragOverlay dropAnimation={null}>
           {activeCard ? <Card card={activeCard} isOverlay /> : null}
