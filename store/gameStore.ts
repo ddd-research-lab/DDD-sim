@@ -1495,7 +1495,8 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, 'SURVEYOR_BOUNCE', true);
                                         s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
                                     } else if (isExMonster) {
-                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, undefined, true);
+                                        const bounceVariant = isFromMonsterZone ? 'SURVEYOR_BOUNCE' : undefined;
+                                        s3.moveCard(selectedId, 'EXTRA_DECK', 0, undefined, false, false, bounceVariant, true);
                                         s3.addLog(formatLog('log_scale_surveyor_bounced', { card: getCardName(cardDef, s3.language) }));
                                     } else {
                                         s3.moveCard(selectedId, 'HAND', 0, undefined, false, false, undefined, true);
@@ -4649,10 +4650,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         let newFaceUpState = false;
                         if (summonVariant === 'SURVEYOR_BOUNCE') {
                             newFaceUpState = false;
-                            newState.turnEffectUsage = {
-                                ...newState.turnEffectUsage,
-                                c032_cannot_summon: 1
-                            };
+                            if (card.cardId === 'c032') {
+                                newState.turnEffectUsage = {
+                                    ...newState.turnEffectUsage,
+                                    c032_cannot_summon: 1
+                                };
+                            }
                         } else if (isMainDeckP) {
                             newFaceUpState = true;
                         } else if (isPendulumAny && isFromField) {
