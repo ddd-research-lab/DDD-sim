@@ -1810,8 +1810,8 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 }
 
                                 sFinal.addLog(sFinal.language === 'ja'
-                                    ? `${returnedNames.join('&')}をデッキに戻す（DDリビルド効果）`
-                                    : `${returnedNames.join('&')}をデッキに戻す（DDリビルド効果）`);
+                                    ? `${returnedNames.join('＆')}をデッキに戻す（DDリビルド効果）`
+                                    : `${returnedNames.join(' & ')} to Deck (DD Rebuild effect)`);
                             } finally {
                                 useGameStore.setState({ isBatching: false });
                                 useGameStore.getState().processUiQueue();
@@ -2150,7 +2150,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 store.addLog(formatLog('log_error_condition'));
                 return;
             }
-            store.startEffectSelection(formatLog('prompt_activate_effect', { card: store.cards[selfId].name }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
+            store.startEffectSelection(formatLog('prompt_activate_effect', { name: getCardName(store.cards[selfId], store.language) }), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
                 if (choice === 'yes') {
                     if (isNegated) return;
                     // Logic: Detach 2
@@ -2159,10 +2159,10 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     // Let's ask.
                     const selectMat = (count: number, mats: string[]) => {
                         if (count === 0) {
-                            store.addLog(formatLog('log_activate_effect', { card: store.cards[selfId].name }));
+                            store.addLog(formatLog('log_activate_effect', { card: getCardName(store.cards[selfId], store.language) }));
                             return;
                         }
-                        store.startEffectSelection(formatLog('prompt_select_material'), mats.map((mid: string) => ({ label: store.cards[mid].name, value: mid })), (mid: string) => {
+                        store.startEffectSelection(formatLog('prompt_select_material'), mats.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })), (mid: string) => {
                             store.moveCard(mid, 'GRAVEYARD', 0, 'MATERIAL');
                             selectMat(count - 1, mats.filter((m: string) => m !== mid));
                         }, false, selfId);
@@ -2941,7 +2941,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         if (options.length === 0) {
             // Provide feedback if attempts are made but usages block
             if (inMonsterZone || inGraveyard) {
-                store.addLog(formatLog('log_effect_already_used', { card: 'DD Defense Soldier' }));
+                store.addLog(formatLog('log_effect_already_used', { card: getCardName(store.cards[selfId], store.language) }));
             }
             return;
         }
@@ -2979,9 +2979,8 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     store.addLog(formatLog('log_error_condition'));
                     return;
                 }
-                // Cost: Banish self
+                // Cost: Banish self (moveCard logs banish automatically)
                 store.moveCard(selfId, 'BANISHED');
-                store.addLog(formatLog('log_banish', { card: store.cards[selfId].name }));
 
                 // Filter: DD P-Monster in GY or face-up ED (Except Machinex, Ark Crisis)
                 const isDDP = (c: Card) => isDDArchetype(c) && c.subType?.includes('PENDULUM') && c.cardId !== 'c018' && c.cardId !== 'c029';
@@ -2992,38 +2991,6 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 const extraP = s.extraDeck.filter(id => {
                     const c = s.cards[id];
                     const isEDType = c.subType?.includes('FUSION') || c.subType?.includes('SYNCHRO') || c.subType?.includes('XYZ') || c.subType?.includes('LINK');
-                    // Face-up ED P-Monsters are those in Extra Deck that are PENDULUM match.
-                    // Note: Face-down ED cards are also in extraDeck. 
-                    // Sim doesn't strictly distinguish face-up/down in array, but usually Face-Up P-Monsters are just in there.
-                    // However, valid targets for "Add to Hand" from ED must be Face-Up.
-                    // Rule: P-Monsters go to ED face-up when destroyed.
-                    // We assume all P-Monsters in ED are candidates?
-                    // No, fusion/synchro/xyz P-Monsters might be face-down if not used yet?
-                    // Actually, main deck P-monsters in ED are always face-up.
-                    // Hybrids (Fusion/P) like Ark Crisis start face-down.
-                    // But effectively, if it's in ED and matches "DD P-Monster", we can treat it as valid target if it's "Face-Up".
-                    // Standard P-Monsters (Main Deck types) in ED are always Face-Up.
-                    // Hybrid P-Monsters ... if they are there, they are likely Face-Up or Face-Down.
-                    // Let's filter by: Main Deck P-Monsters OR Hybrid P-Monsters that are explicitly Face-Up?
-                    // Sim workaround: Allow all non-Hybrid P-Monsters. Hybrids are usually excluded by specific CardId checks?
-                    // User said: "Except Machinex (c030 - Wait c030 is Machinex) and Ark Crisis (c029)".
-                    // c018 is Machinex (XYZ/P). c029 is Ark Crisis (Fusion/P).
-                    // c030 is Zero Machinex (P/Effect - Main Deck?). No, c030 is "Zero Doom Queen Machinex" (P/Effect).
-                    // Wait, let's check definitions.
-                    // c030 is "DDD Zero Doom Queen Machinex" -> PENDULUM/EFFECT (Main Deck).
-                    // c018 is "DDD Deviser King Deus Machinex" -> XYZ/PENDULUM.
-                    // User said "Except Machinex and Ark Crisis".
-                    // They likely mean the Extra Deck Hybrids: Deus Machinex (c018) and Ark Crisis (c029).
-                    // And maybe Zero Machinex (c030) if it's in ED? It's a Main Deck P-monster, so if it's in ED, it's Face-Up.
-                    // User said "Ex Deck (Deus Machinex, Ark Crisis except)".
-                    // So we must allow Main Deck P-Monsters.
-                    // Current filter: !isEDType && isDDP.
-                    // isEDType blocks Fusion/Synchro/Xyz/Link.
-                    // This correctly blocks Deus Machinex (Xyz) and Ark Crisis (Fusion).
-                    // Does it block anything else?
-                    // Genghis, etc are not P-Monsters.
-                    // So `!isEDType` allows Main Deck P-Monsters.
-
                     return !isEDType && isDDP(c);
                 });
 
@@ -3038,8 +3005,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 store.startSearch(
                     (c: any) => uniqueTargets.includes(c.id),
                     (sid: string) => {
-                        store.moveCard(sid, 'HAND');
-                        // Log handled by moveCard
+                        const cardName = getCardName(store.cards[sid], store.language);
+                        store.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true);
+                        store.addLog(formatLog('log_defense_soldier_recovery', { card: cardName }));
                         store.addTurnEffectUsage('c033_gy_search');
                     },
                     formatLog('prompt_select_dd_p'),
@@ -5457,7 +5425,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         const copies = state.deck.filter(id => state.cards[id].cardId === card.cardId).length;
         if (copies >= 3) {
-            state.addLog(formatLog('log_max_copies_reached', { card: card.name }));
+            state.addLog(formatLog('log_max_copies_reached', { card: getCardName(card, state.language) }));
             return;
         }
 
@@ -5482,7 +5450,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         const copies = state.deck.filter(id => state.cards[id].cardId === card.cardId).length;
         if (copies <= 1) {
-            state.addLog(formatLog('log_min_copies_reached', { card: card.name }));
+            state.addLog(formatLog('log_min_copies_reached', { card: getCardName(card, state.language) }));
             return;
         }
 
@@ -5506,7 +5474,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const card = state.cards[existingInstance];
         const copies = state.extraDeck.filter(id => state.cards[id].cardId === cardId).length;
         if (copies >= 3) {
-            state.addLog(formatLog('log_max_copies_reached', { card: card.name }));
+            state.addLog(formatLog('log_max_copies_reached', { card: getCardName(card, state.language) }));
             return;
         }
 
@@ -5540,7 +5508,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // If we only have 1 copy left, we might want to check if the user is trying to remove the last copy. 
             // Requirement says "1~3枚の範囲". So minimum is 1.
             const card = state.cards[instancesToRemove[0]];
-            state.addLog(formatLog('log_min_copies_reached', { card: card?.name || 'this card' }));
+            state.addLog(formatLog('log_min_copies_reached', { card: getCardName(card, state.language) }));
             return;
         }
 
@@ -6493,7 +6461,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                                 const s3 = get();
                                                                 const bounceName = getCardName(s3.cards[bounceId], s3.language);
                                                                 s3.moveCard(bounceId, 'HAND');
-                                                                s3.addLog(s3.language === 'ja' ? `${bounceName}バウンス（馬龍効果）` : `${bounceName} bounce (Baryon effect)`);
+                                                                s3.addLog(s3.language === 'ja' ? `${bounceName}をバウンス（馬龍効果）` : `Bounced ${bounceName} (Baryon effect)`);
                                                                 s3.pushHistory(true);
                                                             },
                                                             'normal'
@@ -6538,7 +6506,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                                         });
 
                                                                         s4.moveCard(placeMonsterId, 'SPELL_TRAP_ZONE', index, undefined, false, false, undefined, true);
-                                                                        s4.addLog(s4.language === 'ja' ? `${mName}を魔罠ゾーンに置く（パックビット効果）` : `Placed ${mName} in S/T Zone (Packbit effect)`);
+                                                                        s4.addLog(s4.language === 'ja' ? `${mName}を魔法・罠ゾーンに置く（パックビット効果）` : `Placed ${mName} in S/T Zone (Packbit effect)`);
                                                                         s4.pushHistory(true);
                                                                     }
                                                                 );
@@ -7129,7 +7097,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                                     destroyCard(target2);
 
                                                                     sFinal.addLog(sFinal.language === 'ja'
-                                                                        ? `${name1}&${name2}破壊（ビヨンド効果）`
+                                                                        ? `${name1}＆${name2}を破壊（ビヨンド効果）`
                                                                         : `Destroyed ${name1} & ${name2} (Beyond effect)`);
                                                                 }
                                                             );
