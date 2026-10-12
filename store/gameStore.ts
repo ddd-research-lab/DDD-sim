@@ -3460,48 +3460,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (state.summonCount >= 5 && !state.nibiruUsed && state.nibiruSimulationEnabled) {
             set({ showNibiruCutIn: true, nibiruUsed: true });
             state.addLog(formatLog('log_nibiru_simplified'));
+            get().pushHistory(true);
             setTimeout(() => {
                 set({ showNibiruCutIn: false });
 
                 const resolveNibiruEffect = () => {
                     const finalState = get();
-                    // Send all monsters to GY (P-Monsters to Extra Deck)
-                    const targets = [...finalState.monsterZones, ...finalState.extraMonsterZones].filter(id => id !== null) as string[];
+                    useGameStore.setState({ isHistoryBatching: true });
+                    try {
+                        // Send all monsters to GY (P-Monsters to Extra Deck)
+                        const targets = [...finalState.monsterZones, ...finalState.extraMonsterZones].filter(id => id !== null) as string[];
 
-                    targets.forEach(id => {
-                        const card = finalState.cards[id];
-                        if (!card) return;
+                        targets.forEach(id => {
+                            const card = finalState.cards[id];
+                            if (!card) return;
 
-                        // Send attached materials to GY
-                        const attachedMats = finalState.materials[id];
-                        if (attachedMats && attachedMats.length > 0) {
-                            attachedMats.forEach(matId => {
-                                finalState.moveCard(matId, 'GRAVEYARD', undefined, 'MATERIAL', false, false, undefined, true);
-                            });
+                            // Send attached materials to GY
+                            const attachedMats = finalState.materials[id];
+                            if (attachedMats && attachedMats.length > 0) {
+                                attachedMats.forEach(matId => {
+                                    finalState.moveCard(matId, 'GRAVEYARD', undefined, 'MATERIAL', false, false, undefined, true, true);
+                                });
+                            }
+
+                            if (card.subType?.includes('PENDULUM')) {
+                                finalState.moveCard(id, 'EXTRA_DECK', undefined, undefined, false, false, undefined, true, true);
+                            } else {
+                                finalState.moveCard(id, 'GRAVEYARD', undefined, undefined, false, false, undefined, true, true);
+                            }
+                        });
+
+                        // Token Generation
+                        const tokenId = `inst_${Date.now()}_nibiru_token`;
+                        const tokenCard = { ...CARD_DATABASE['c_token_nibiru'], id: tokenId };
+                        const newCards = { ...get().cards, [tokenId]: tokenCard };
+
+                        // Find first empty center zone logic: Zone 2 is Center, then others if full. Both sides.
+                        const finalStateAfterClear = get();
+                        const monsterZones = [...finalStateAfterClear.monsterZones];
+                        const targetIndex = monsterZones[2] === null ? 2 : monsterZones.findIndex(z => z === null);
+
+                        if (targetIndex !== -1) {
+                            monsterZones[targetIndex] = tokenId;
                         }
-
-                        if (card.subType?.includes('PENDULUM')) {
-                            finalState.moveCard(id, 'EXTRA_DECK', undefined, undefined, false, false, undefined, true);
-                        } else {
-                            finalState.moveCard(id, 'GRAVEYARD', undefined, undefined, false, false, undefined, true);
-                        }
-                    });
-
-                    // Token Generation
-                    const tokenId = `inst_${Date.now()}_nibiru_token`;
-                    const tokenCard = { ...CARD_DATABASE['c_token_nibiru'], id: tokenId };
-                    const newCards = { ...finalState.cards, [tokenId]: tokenCard };
-                    set({ cards: newCards });
-
-                    // Find first empty center zone logic: Zone 2 is Center, then others if full. Both sides.
-                    // For simplicity, we just put it in Monster Zone index 2 (middle) or the first available.
-                    const finalStateAfterClear = get();
-                    const monsterZones = [...finalStateAfterClear.monsterZones];
-                    const targetIndex = monsterZones[2] === null ? 2 : monsterZones.findIndex(z => z === null);
-
-                    if (targetIndex !== -1) {
-                        monsterZones[targetIndex] = tokenId;
-                        set({ monsterZones });
+                        set({ cards: newCards, monsterZones });
+                    } finally {
+                        useGameStore.setState({ isHistoryBatching: false });
+                        get().pushHistory(true);
                     }
                 };
 
@@ -7441,6 +7446,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
             || fullHistory[fullHistory.length - 1]?.logs
             || [...state.logs];
 
+        // Chronological logs (oldest to newest) for accurate step slicing
+        const chronologicalLogs = [...originalLogs].reverse();
+
         // Determine starting step index
         let startStep = 0;
         if (typeof startIndex === 'number') {
@@ -7454,7 +7462,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ? (fullHistory[startStep]?.logCount || fullHistory[startStep]?.logs?.length || 0)
             : 0;
         const initialLogs = isResumingFromMid
-            ? originalLogs.slice(0, initialLogCount)
+            ? chronologicalLogs.slice(0, initialLogCount).reverse()
             : [];
 
         set({
@@ -7608,7 +7616,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             // Sync logs immediately at the start of the step to ensure synchronicity with animations and cut-ins
             const logCount = snapshot.logCount || 0;
-            const currentLogs = originalLogs.slice(0, logCount);
+            const currentLogs = chronologicalLogs.slice(0, logCount).reverse();
             set({ logs: currentLogs, currentStepIndex: i });
 
             // --- Detect moved cards FIRST (uses current DOM which hasn't been modified yet) ---
@@ -7666,10 +7674,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
             prevPendulumSummonCount = sCount;
 
-            // Detect Opponent Hand Traps / Interruptions Cut-ins from newly added logs
+            // Detect Opponent Hand Traps / Interruptions Cut-ins from newly added logs (chronological slice)
             const prevLogCount = prevSnapshot?.logCount || 0;
             const currentStepLogCount = snapshot.logCount || 0;
-            const newlyAddedLogs = originalLogs.slice(prevLogCount, currentStepLogCount);
+            const newlyAddedLogs = chronologicalLogs.slice(prevLogCount, currentStepLogCount);
 
             let cutInToTrigger: string | null = null;
             newlyAddedLogs.forEach(l => {
@@ -7679,7 +7687,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     cutInToTrigger = "impermanence";
                 } else if (l.includes("霊王の波動") || l.includes("Dominus Impulse")) {
                     cutInToTrigger = "impulse";
-                } else if (l.includes("ニビル") || l.includes("Nibiru")) {
+                } else if ((l.includes("ニビル") || l.includes("Nibiru")) && !l.includes("無効") && !l.includes("negate")) {
                     cutInToTrigger = "nibiru";
                 } else if (l.includes("ドロール") || l.includes("Droll")) {
                     cutInToTrigger = "droll";
@@ -7687,6 +7695,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     cutInToTrigger = "harmonia";
                 }
             });
+
+            // Trigger Nibiru cut-in BEFORE monsters are moved/wiped from field (meteor crashes before board wipe)
+            if (cutInToTrigger === "nibiru") {
+                set({ showNibiruCutIn: true });
+                await waitReplay(1333);
+                set({ showNibiruCutIn: false });
+                cutInToTrigger = null; // Consumed so it does not trigger again after moves
+            }
 
             // Skip completely redundant/duplicate history snapshots (same logs, no moves, no cut-in)
             if (prevSnapshot && currentStepLogCount === prevLogCount && moves.length === 0 && !cutInToTrigger) {
@@ -8056,7 +8072,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
                 if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
-                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: true });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
                 if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: true });
 
@@ -8065,7 +8080,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: false });
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
                 if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
-                if (cutInToTrigger === "nibiru") set({ showNibiruCutIn: false });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: false });
                 if (cutInToTrigger === "harmonia") set({ showHarmoniaCutIn: false });
             }
