@@ -81,6 +81,15 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             return;
         }
 
+        // Target Selection Click (prioritize over Trigger Candidate so trigger monsters can be targeted)
+        if (isTargeting) {
+            if (isValidTarget) {
+                e.stopPropagation(); // Prevent drag or other clicks
+                resolveTarget(card.id);
+            }
+            return;
+        }
+
         // Trigger Candidate Click
         if (isTriggerCandidate) {
             e.stopPropagation(); // Prevent drag or other clicks
@@ -88,16 +97,9 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             return;
         }
 
-        if (isValidTarget) {
-            e.stopPropagation(); // Prevent drag or other clicks
-            resolveTarget(card.id);
-        } else {
-            if (isTargeting) {
-                // Invalid target click
-            } else if (!isSelectingZone && isInteractive) {
-                // Manual Activation
-                activateEffect(card.id);
-            }
+        if (!isSelectingZone && isInteractive) {
+            // Manual Activation
+            activateEffect(card.id);
         }
     };
 
@@ -144,7 +146,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             data-card-id={card.id}
             className={`
                 relative
-                ${isTriggerCandidate ? 'trigger-glow' : ''}
+                ${isTriggerCandidate && !isTargeting ? 'trigger-glow' : ''}
                 ${isTargeting && isValidTarget ? 'ring-4 ring-red-500 cursor-pointer z-50' : ''}
                 ${isTargeting && !isValidTarget ? 'opacity-50 grayscale' : ''}
                 ${isSelected ? 'ring-4 ring-blue-500' : ''}

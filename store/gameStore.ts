@@ -2872,31 +2872,50 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 store.addLog(formatLog('log_error_condition'));
                 // Don't return - allow other interactions
             } else {
-                // Count Dark Contract cards on Field and GY only
-                const contractCount = [...store.spellTrapZones, store.fieldZone, ...store.graveyard]
-                    .filter(id => id && (store.cards[id]?.name?.includes('Dark Contract') || store.cards[id]?.name?.includes('契約書')))
+                const getContractCount = (s: GameState) => [...s.spellTrapZones, s.fieldZone, ...s.graveyard]
+                    .filter(id => {
+                        if (!id) return false;
+                        if (s.cardFlags[id]?.includes('isHarmoniaPlaced')) return false;
+                        const c = s.cards[id];
+                        return c && (c.name?.includes('Dark Contract') || c.name?.includes('契約書') || c.nameJa?.includes('契約書'));
+                    })
                     .length;
 
-                if (contractCount === 0) {
+                // Count Dark Contract cards on Field and GY only
+                const initialContractCount = getContractCount(store);
+
+                if (initialContractCount === 0) {
                     store.addLog(formatLog('log_error_condition'));
                 } else {
                     store.startEffectSelection(
                         formatLog('prompt_lance_soldier_level'),
                         [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
-                        (choice: string) => {
+                        (choice: string, isNegated?: boolean) => {
                             if (choice === 'yes') {
-                                store.addTurnEffectUsage(levelHoptKey);
-                                store.startTargeting(
-                                    // Fix: Explicitly check Monster Zones to exclude P-Zones and Materials (which might be "green" otherwise)
-                                    (c: any) => (store.monsterZones.includes(c.id) || store.extraMonsterZones.includes(c.id)) && isDDArchetype(c) && c.type === 'MONSTER' && !c.subType?.includes('XYZ') && !c.subType?.includes('LINK'),
+                                const currentStore = useGameStore.getState();
+                                currentStore.addTurnEffectUsage(levelHoptKey, selfId);
+                                if (isNegated) return;
+
+                                currentStore.startTargeting(
+                                    // Explicitly check Monster Zones using latest state to allow targeting any face-up DD monster with a Level
+                                    (c: any) => {
+                                        const s = useGameStore.getState();
+                                        const isOnMonsterField = s.monsterZones.includes(c.id) || s.extraMonsterZones.includes(c.id);
+                                        const isHarmonia = s.cardFlags[c.id]?.includes('isHarmoniaPlaced');
+                                        return isOnMonsterField && !isHarmonia && isDDArchetype(c) && c.type === 'MONSTER' && !c.subType?.includes('XYZ') && !c.subType?.includes('LINK');
+                                    },
                                     (targetId: string) => {
-                                        const options = Array.from({ length: contractCount }, (_, i: number) => ({ label: `+${i + 1}`, value: String(i + 1) }));
-                                        store.startEffectSelection(formatLog('prompt_lance_level_select', { max: String(contractCount) }), options, (val: string) => {
-                                            const amount = parseInt(val);
-                                            store.modifyCardProperty(targetId, 'level', amount, 'add');
-                                            store.addLog(formatLog('log_lance_soldier_level_up', { card: getCardName(store.cards[targetId], store.language), amount: amount.toString() }));
+                                        const s = useGameStore.getState();
+                                        const activeContractCount = Math.max(1, getContractCount(s));
+                                        const options = Array.from({ length: activeContractCount }, (_, i: number) => ({ label: `+${i + 1}`, value: String(i + 1) }));
+                                        s.startEffectSelection(formatLog('prompt_lance_level_select', { max: String(activeContractCount) }), options, (val: string) => {
+                                            const latestStore = useGameStore.getState();
+                                            const amount = parseInt(val, 10);
+                                            if (isNaN(amount)) return;
+                                            latestStore.modifyCardProperty(targetId, 'level', amount, 'add');
+                                            latestStore.addLog(formatLog('log_lance_soldier_level_up', { card: getCardName(latestStore.cards[targetId], latestStore.language), amount: amount.toString() }));
                                             useGameStore.getState().pushHistory(true);
-                                        }, false, selfId);
+                                        });
                                     }
                                 );
                             }
@@ -4906,23 +4925,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 // --- LEVEL RESET ON LEAVING FIELD ---
-                // Reset level modifiers for Scale Surveyor (c014) and Lance Soldier (c032) when leaving field
+                // Reset level modifiers for any monster (e.g., Scale Surveyor c014, Lance Soldier c032, or any DD monster modified by Lance Soldier) when leaving field
                 // EXCEPT when used as Xyz material (they'll be attached to the Xyz monster)
                 const isUsedAsXyzMaterial = state.isMaterialMove;
                 if (leavingField && !isUsedAsXyzMaterial) {
-                    const cardDef = card.cardId;
-                    if (cardDef === 'c014' || cardDef === 'c032') {
-                        // Remove level modifier
-                        const newModifiers = { ...newState.cardPropertyModifiers };
-                        if (newModifiers[cardId]) {
-                            delete newModifiers[cardId].level;
-                            // If no modifiers left, remove the entry entirely
-                            if (Object.keys(newModifiers[cardId]).length === 0) {
-                                delete newModifiers[cardId];
-                            }
+                    const newModifiers = { ...newState.cardPropertyModifiers };
+                    if (newModifiers[cardId]) {
+                        delete newModifiers[cardId].level;
+                        // If no modifiers left, remove the entry entirely
+                        if (Object.keys(newModifiers[cardId]).length === 0) {
+                            delete newModifiers[cardId];
                         }
-                        newState.cardPropertyModifiers = newModifiers;
                     }
+                    newState.cardPropertyModifiers = newModifiers;
                 }
 
                 // 2. Machinex (Destruction Check Logic)
