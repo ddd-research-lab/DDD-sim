@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useRef, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatLog, getCardName } from '@/data/locales';
@@ -42,9 +42,17 @@ const CARD_ABBREVIATIONS: Record<string, string> = {
     '戦乙女の契約書': '戦乙女',
     '常闇の契約書': '常闇',
     'DDDヘッドハント': 'ヘッドハント',
+    '灰流うらら': 'うらら',
+    '無限泡影': '泡影',
+    '霊王の波動': 'インパルス',
+    '原始生命態ニビル': 'ニビル',
+    '原始生命態トークン': 'ニビルトークン',
+    'ドロール＆ロックバード': 'ドロバ',
+    'ドロール&ロックバード': 'ドロバ',
     'DDD烈火王テムジン': 'テムジン',
     'DDD聖賢王アルフレッド': 'アルフレッド',
     'DDD烈火大王エグゼクティブ・テムジン': '大王テムジン',
+    'DDDD偉次元元王アーク・クライシス': 'クライシス',
     'DDDD偉次元王アーク・クライシス': 'クライシス',
     'DDD創始王クロヴィス': 'クロヴィス',
     'DDD呪血王サイフリート': 'サイフリート',
@@ -56,6 +64,19 @@ const CARD_ABBREVIATIONS: Record<string, string> = {
     'DDD赦俿王デス・マキナ': 'デスマキナ',
     'DDD深淵王ビルガメス': 'ビルガメス',
     'DDD天空王ゼウス・ラグナロク': 'ゼウス',
+    'マルチャミー・フワロス': 'フワロス',
+    '軌跡の魔術師': 'ビヨンド',
+    'DDヴァイス・テュポーン': 'テュポーン',
+    'DDリビルド': 'リビルド',
+    '契約書のリビルド': 'リビルド',
+    'DDD疾風大王エグゼクティブ・アレクサンダー': '大王アレクサンダー',
+    'ナイトメア・スローン': 'スローン',
+    'ダーク・オカルティズム': 'オカルティズム',
+    '異次元の契約書': 'オカルティズム',
+    'DDD双暁王カリ・ユガ': 'カリユガ',
+    '調和ノ天救竜': 'ハルモニア',
+    '魔界特派員デスキャスター': 'デスキャスター',
+    'グラヴィティ・コントローラー': 'グラコン',
 };
 
 const applyAbbreviations = (text: string): string => {
@@ -86,6 +107,18 @@ const cleanLog = (text: string): string => {
     return result.replace(/[。\.]$/, '').trim();
 };
 
+const isSystemOrErrorLog = (cleaned: string) => {
+    return cleaned === cleanLog(formatLog('log_error_condition'))
+        || cleaned === cleanLog(formatLog('log_error_material'))
+        || cleaned === cleanLog(formatLog('log_arc_crisis_fail'))
+        || cleaned.includes('の効果は既に使用されています（ターン1回）')
+        || cleaned === cleanLog(formatLog('log_return_from_jump'))
+        || cleaned === cleanLog(formatLog('log_sys_already_at_step'))
+        || cleaned === cleanLog(formatLog('log_sys_state_not_found'))
+        || cleaned === cleanLog(formatLog('log_undo_empty'))
+        || (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'));
+};
+
 export default function ArchiveDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const [archive, setArchive] = useState<ArchiveDetail | null>(null);
@@ -94,6 +127,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
     const [totalBytes, setTotalBytes] = useState<number | null>(null);
     const [useAbbreviation, setUseAbbreviation] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const xKeyPressed = useRef(false);
     const router = useRouter();
 
     // Helper to resolve card IDs to localized names
@@ -160,14 +194,69 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
         };
 
         loadData();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.isComposing) return;
+            if (e.key === 'x' || e.key === 'X') xKeyPressed.current = true;
+        };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'x' || e.key === 'X') xKeyPressed.current = false;
+        };
+        const handleBlur = () => {
+            xKeyPressed.current = false;
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleBlur);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleBlur);
+        };
     }, [id]);
 
     const handleReplay = () => {
+        router.push(`/?replayId=${id}&autoReplay=1`);
+    };
+
+    const handleStartFromInitialHand = () => {
+        router.push(`/?replayId=${id}&step=0`);
+    };
+
+    const handleOpenFinalBoard = () => {
         router.push(`/?replayId=${id}`);
+    };
+
+    const handleAdminDelete = async () => {
+        const adminKey = prompt('管理者キーを入力してください:') || '';
+        if (!adminKey) return;
+        if (!window.confirm('このルートを削除しますか？この操作は元に戻せません。')) return;
+
+        try {
+            const res = await fetch(`/api/archive/${id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminKey }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(`削除に失敗しました: ${err.error || '不明なエラー'}`);
+                return;
+            }
+            router.push('/archive');
+        } catch (err) {
+            console.error(err);
+            alert('削除に失敗しました。');
+        }
     };
 
     const handleLike = async () => {
         if (!archive) return;
+        if (xKeyPressed.current) {
+            xKeyPressed.current = false;
+            handleAdminDelete();
+            return;
+        }
         const userId = getUserId();
         if (archive.likedBy?.includes(userId)) return;
 
@@ -325,11 +414,59 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
             </div>
         );
     }
-    if (!archive) return <div style={{ color: '#fff', padding: '20px' }}>アーカイブが見つかりませんでした。</div>;
+    if (!archive) {
+        return (
+            <div style={{ color: '#fff', padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+                <div style={{ marginBottom: '20px' }}>
+                    <Link href="/archive" style={{ color: '#2196F3', textDecoration: 'none', fontWeight: 'bold' }}>
+                        ← {formatLog('ui_archive') || 'ルート倉庫'}へ戻る
+                    </Link>
+                </div>
+                <div>アーカイブが見つかりませんでした。</div>
+            </div>
+        );
+    }
 
     return (
         <div style={{ padding: '20px', color: '#fff', maxWidth: '800px', margin: '0 auto' }}>
-            <div style={{ marginTop: '20px', padding: '15px', background: '#222', borderRadius: '12px', border: '1px solid #444', marginBottom: '20px' }}>
+            {/* Top Navigation Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                <Link
+                    href="/archive"
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        backgroundColor: '#333',
+                        color: '#fff',
+                        border: '1px solid #555',
+                        borderRadius: '8px',
+                        textDecoration: 'none',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    ← {formatLog('ui_archive') || 'ルート倉庫'}へ戻る
+                </Link>
+                <Link
+                    href="/"
+                    style={{
+                        display: 'inline-block',
+                        padding: '8px 16px',
+                        backgroundColor: '#2196F3',
+                        color: '#fff',
+                        borderRadius: '8px',
+                        textDecoration: 'none',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    {formatLog('ui_back_to_simulator') || 'シミュレーターへ戻る'}
+                </Link>
+            </div>
+
+            <div style={{ padding: '15px', background: '#222', borderRadius: '12px', border: '1px solid #444', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                         <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff9800', marginBottom: '4px' }}>
@@ -385,7 +522,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                 </div>
 
                 <div style={{ background: '#222', padding: '15px', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <h3 style={{ margin: 0 }}>{formatLog('ui_duel_log')}</h3>
                             <span style={{ fontSize: '11px', color: '#888' }}>（クリックでシミュレーターへジャンプ）</span>
@@ -430,17 +567,8 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                             <button
                                 onClick={() => {
                                     let displayIdx = 1;
-                                    const isSystemOrErrorLog = (cleaned: string) => {
-                                        return cleaned === cleanLog(formatLog('log_error_condition'))
-                                            || cleaned.includes('の効果は既に使用されています（ターン1回）')
-                                            || cleaned === cleanLog(formatLog('log_return_from_jump'))
-                                            || cleaned === cleanLog(formatLog('log_sys_already_at_step'))
-                                            || cleaned === cleanLog(formatLog('log_sys_state_not_found'))
-                                            || cleaned === cleanLog(formatLog('log_undo_empty'))
-                                            || (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'));
-                                    };
                                     // Process in display order (reversed)
-                                    const logText = [...archive.logs].reverse()
+                                    const logText = [...(archive.logs || [])].reverse()
                                         .filter((log) => !isSystemOrErrorLog(cleanLog(log)))
                                         .map((log) => {
                                             const cleaned = cleanLog(log);
@@ -471,17 +599,8 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                     <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#111', padding: '10px', fontSize: '12px', fontFamily: 'monospace' }}>
                         {(() => {
                             let displayIdx = 1;
-                            const isSystemOrErrorLog = (cleaned: string) => {
-                                return cleaned === cleanLog(formatLog('log_error_condition'))
-                                    || cleaned.includes('の効果は既に使用されています（ターン1回）')
-                                    || cleaned === cleanLog(formatLog('log_return_from_jump'))
-                                    || cleaned === cleanLog(formatLog('log_sys_already_at_step'))
-                                    || cleaned === cleanLog(formatLog('log_sys_state_not_found'))
-                                    || cleaned === cleanLog(formatLog('log_undo_empty'))
-                                    || (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'));
-                            };
                             // Reverse first, then map to apply numbering from the top
-                            const displayLogs = [...archive.logs].reverse()
+                            const displayLogs = [...(archive.logs || [])].reverse()
                                 .filter((log) => !isSystemOrErrorLog(cleanLog(log)))
                                 .map((log) => {
                                     const cleaned = cleanLog(log);
@@ -521,41 +640,76 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
-                    <button
-                        onClick={handleLike}
-                        disabled={hasLiked}
-                        style={{
-                            padding: '10px 20px',
-                            fontSize: '18px',
-                            background: hasLiked ? '#444' : '#ff4081',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: hasLiked ? 'default' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <span style={{ fontSize: '20px' }}>{hasLiked ? '♥' : '♡'}</span>
-                        {archive.likes || 0}
-                    </button>
-                    <button
-                        onClick={handleReplay}
-                        style={{
-                            flex: 1,
-                            padding: '10px',
-                            fontSize: '18px',
-                            background: '#2196F3',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {formatLog('ui_replay_in_simulator') || 'シミュレーターでこの手札から再生'}
-                    </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                            onClick={handleLike}
+                            title="いいね（Xキーを押しながらで管理者削除）"
+                            style={{
+                                padding: '10px 20px',
+                                fontSize: '18px',
+                                background: hasLiked ? '#444' : '#ff4081',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: hasLiked ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <span style={{ fontSize: '20px' }}>{hasLiked ? '♥' : '♡'}</span>
+                            {archive.likes || 0}
+                        </button>
+                        <button
+                            onClick={handleReplay}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                fontSize: '17px',
+                                fontWeight: 'bold',
+                                background: '#2196F3',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ▶ {formatLog('ui_replay_in_simulator') || 'シミュレーターでこの手札から再生'}
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            onClick={handleStartFromInitialHand}
+                            style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: '#333',
+                                color: '#ddd',
+                                border: '1px solid #555',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            🎴 初動手札から自分で操作
+                        </button>
+                        <button
+                            onClick={handleOpenFinalBoard}
+                            style={{
+                                flex: 1,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: '#333',
+                                color: '#ddd',
+                                border: '1px solid #555',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            📋 最終盤面を開く
+                        </button>
+                    </div>
                 </div>
 
                 {isAuthor && (

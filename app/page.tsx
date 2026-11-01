@@ -35,6 +35,7 @@ function ReplayLoader() {
   const searchParams = useSearchParams();
   const replayId = searchParams.get('replayId');
   const step = searchParams.get('step');
+  const autoReplay = searchParams.get('autoReplay');
   const loadArchive = useGameStore(state => state.loadArchive);
 
   useEffect(() => {
@@ -47,16 +48,18 @@ function ReplayLoader() {
             if (step !== null) {
               const stepNum = parseInt(step, 10);
               if (!isNaN(stepNum) && stepNum >= 0) {
-                setTimeout(() => {
-                  useGameStore.getState().jumpToLog(stepNum - 1);
-                }, 50);
+                useGameStore.getState().jumpToLog(stepNum - 1);
               }
+            } else if (autoReplay === '1') {
+              setTimeout(() => {
+                useGameStore.getState().replay(0, true);
+              }, 100);
             }
           }
         })
         .catch(err => console.error('Failed to load replay', err));
     }
-  }, [replayId, step, loadArchive]);
+  }, [replayId, step, autoReplay, loadArchive]);
 
   return null;
 }
@@ -132,12 +135,14 @@ export default function Home() {
     '無限泡影': '泡影',
     '霊王の波動': 'インパルス',
     '原始生命態ニビル': 'ニビル',
+    '原始生命態トークン': 'ニビルトークン',
     'ドロール＆ロックバード': 'ドロバ',
     'ドロール&ロックバード': 'ドロバ',
     'DDD烈火王テムジン': 'テムジン',
     'DDD聖賢王アルフレッド': 'アルフレッド',
     'DDD烈火大王エグゼクティブ・テムジン': '大王テムジン',
     'DDDD偉次元元王アーク・クライシス': 'アーククライシス',
+    'DDDD偉次元王アーク・クライシス': 'アーククライシス',
     'DDD創始王クロヴィス': 'クロヴィス',
     'DDD呪血王サイフリート': 'サイフリート',
     'DDD超死偉王ホワイテスト・ヘル・アーマゲドン': '白アーマゲドン',
@@ -152,10 +157,13 @@ export default function Home() {
     '軌跡の魔術師': 'ビヨンド',
     'DDヴァイス・テュポーン': 'テュポーン',
     'DDリビルド': 'リビルド',
+    '契約書のリビルド': 'リビルド',
     'DDD疾風大王エグゼクティブ・アレクサンダー': '大王アレクサンダー',
     'ナイトメア・スローン': 'スローン',
     'ダーク・オカルティズム': 'オカルティズム',
+    '異次元の契約書': 'オカルティズム',
     'DDD双暁王カリ・ユガ': 'カリユガ',
+    '調和ノ天救竜': 'ハルモニア',
     '魔界特派員デスキャスター': 'デスキャスター',
     'グラヴィティ・コントローラー': 'グラコン',
   };

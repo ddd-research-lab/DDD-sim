@@ -18,12 +18,68 @@ interface Archive {
     authorId?: string;
 }
 
+const CARD_ABBREVIATIONS: Record<string, string> = {
+    'DD魔導賢者ケプラー': 'ケプラー',
+    'DDスケール・サーベイヤー': 'スケール',
+    'DD魔導賢者コペルニクス': 'コペル',
+    'DDオルトロス': 'オルトロス',
+    'DDグリフォン': 'グリフォン',
+    'DDD壊薙王アビス・ラグナロク': 'アビス',
+    'DD魔導賢者トーマス': 'トーマス',
+    'DDカウント・サーベイヤー': 'カウント',
+    'DDD零死王ゼロ・マキナ': 'ゼロマキナ',
+    'DDネクロ・スライム': 'ネクロ',
+    'DDランス・ソルジャー': 'ランス',
+    'DDディフェンス・ソルジャー': 'ディフェンス',
+    '地獄門の契約書': '地獄門',
+    '魔神王の契約書': '魔神王',
+    '零王の契約書': '零王',
+    'ワン・フォー・ワン': 'ワンフォ',
+    '戦乙女の契約書': '戦乙女',
+    '常闇の契約書': '常闇',
+    'DDDヘッドハント': 'ヘッドハント',
+    '灰流うらら': 'うらら',
+    '無限泡影': '泡影',
+    '霊王の波動': 'インパルス',
+    '原始生命態ニビル': 'ニビル',
+    'ドロール＆ロックバード': 'ドロバ',
+    'DDD烈火王テムジン': 'テムジン',
+    'DDD聖賢王アルフレッド': 'アルフレッド',
+    'DDD烈火大王エグゼクティブ・テムジン': '大王テムジン',
+    'DDDD偉次元元王アーク・クライシス': 'アーククライシス クライシス',
+    'DDDD偉次元王アーク・クライシス': 'アーククライシス クライシス',
+    'DDD創始王クロヴィス': 'クロヴィス',
+    'DDD呪血王サイフリート': 'サイフリート',
+    'DDD超死偉王ホワイテスト・ヘル・アーマゲドン': '白アーマゲドン',
+    'DDD怒濤王シーザー': 'シーザー',
+    'DDD智慧王ソロモン': 'ソロモン',
+    'DDD狙撃王テル': 'テル',
+    'DDD怒濤大王エグゼクティブ・シーザー': '大王シーザー',
+    'DDD赦俿王デス・マキナ': 'デスマキナ',
+    'DDD深淵王ビルガメス': 'ビルガメス',
+    'DDD天空王ゼウス・ラグナロク': 'ゼウス',
+    'マルチャミー・フワロス': 'フワロス',
+    '軌跡の魔術師': 'ビヨンド',
+    'DDヴァイス・テュポーン': 'テュポーン',
+    'DDリビルド': 'リビルド',
+    '契約書のリビルド': 'リビルド',
+    'DDD疾風大王エグゼクティブ・アレクサンダー': '大王アレクサンダー',
+    'ナイトメア・スローン': 'スローン',
+    'ダーク・オカルティズム': 'オカルティズム',
+    '異次元の契約書': 'オカルティズム',
+    'DDD双暁王カリ・ユガ': 'カリユガ',
+    '調和ノ天救竜': 'ハルモニア',
+    '魔界特派員デスキャスター': 'デスキャスター',
+    'グラヴィティ・コントローラー': 'グラコン',
+};
+
 export default function ArchiveListPage() {
     const [archives, setArchives] = useState<Archive[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadedBytes, setLoadedBytes] = useState(0);
     const [totalBytes, setTotalBytes] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'newest' | 'likes' | 'mine'>('newest');
     const [language, setLanguage] = useState('ja'); // Default to ja
     const xKeyPressed = useRef(false);
     const isAdmin = searchQuery === 'administrator privileges';
@@ -41,7 +97,7 @@ export default function ArchiveListPage() {
                 const reader = res.body?.getReader();
                 if (!reader) {
                     const data = await res.json();
-                    setArchives(data);
+                    setArchives(Array.isArray(data) ? data : []);
                     setLoading(false);
                     return;
                 }
@@ -68,7 +124,7 @@ export default function ArchiveListPage() {
 
                 const text = new TextDecoder("utf-8").decode(allChunks);
                 const data = JSON.parse(text);
-                setArchives(data);
+                setArchives(Array.isArray(data) ? data : []);
                 setLoading(false);
             } catch (err) {
                 console.error(err);
@@ -219,16 +275,43 @@ export default function ArchiveListPage() {
         return setup; // Return as-is if it's legacy text
     };
 
-    const filteredArchives = archives.filter(archive => {
-        if (isAdmin) return true; // Administrator privileges keyword shows all
-        if (!searchQuery) return true;
-        const resolvedNames = resolveSetupNames(archive.initialSetup).toLowerCase();
-        const rawSetup = archive.initialSetup.toLowerCase();
-        const query = searchQuery.toLowerCase();
-        return resolvedNames.includes(query) || rawSetup.includes(query);
-    });
+    const resolveAbbreviatedNames = (fullText: string): string => {
+        let abbr = fullText;
+        for (const [fullName, shortName] of Object.entries(CARD_ABBREVIATIONS)) {
+            if (abbr.includes(fullName)) {
+                abbr += ` ${shortName}`;
+            }
+        }
+        return abbr;
+    };
 
     const userId = getUserId();
+
+    const filteredArchives = archives
+        .filter(archive => {
+            if (sortBy === 'mine' && archive.authorId !== userId) return false;
+            if (isAdmin) return true; // Administrator privileges keyword shows all
+            if (!searchQuery.trim()) return true;
+            const rawSetup = archive.initialSetup || '';
+            const resolvedNames = resolveSetupNames(rawSetup);
+            const searchableSetup = resolveAbbreviatedNames(resolvedNames).toLowerCase();
+            const explanationText = (archive.explanation || '').toLowerCase();
+            const nicknameText = (archive.nickname || '').toLowerCase();
+            const query = searchQuery.trim().toLowerCase();
+            return (
+                searchableSetup.includes(query) ||
+                rawSetup.toLowerCase().includes(query) ||
+                explanationText.includes(query) ||
+                nicknameText.includes(query)
+            );
+        })
+        .sort((a, b) => {
+            if (sortBy === 'likes') {
+                const diff = (b.likes || 0) - (a.likes || 0);
+                if (diff !== 0) return diff;
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
 
     if (loading) {
         const percent = totalBytes ? Math.round((loadedBytes / totalBytes) * 100) : 0;
@@ -301,14 +384,14 @@ export default function ArchiveListPage() {
 
     return (
         <div style={{ padding: '20px', color: '#fff', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '15px' }}>
                 <h1 style={{ margin: 0 }}>{formatLog('ui_archive')}</h1>
 
                 {/* Search Input */}
-                <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+                <div style={{ position: 'relative', flex: 1, maxWidth: '420px' }}>
                     <input
                         type="text"
-                        placeholder={`${formatLog('ui_search_initial_setup')}...`}
+                        placeholder="初動カード・略称・解説・投稿者名で検索..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         style={{
@@ -348,140 +431,163 @@ export default function ArchiveListPage() {
                 </Link>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                {filteredArchives.map(archive => (
-                    <div key={archive.id} style={{
-                        background: '#222',
-                        padding: '15px',
-                        borderRadius: '12px',
-                        border: '1px solid #444',
-                        position: 'relative',
-                        transition: 'transform 0.2s ease, border-color 0.2s ease',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-5px)';
-                            e.currentTarget.style.borderColor = '#666';
+            {/* Sort / Filter Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {([
+                        { key: 'newest', label: '🕒 新着順' },
+                        { key: 'likes', label: '♥ いいね順' },
+                        { key: 'mine', label: '👤 自分の投稿' }
+                    ] as const).map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setSortBy(tab.key)}
+                            style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                border: sortBy === tab.key ? '1px solid #2196F3' : '1px solid #444',
+                                background: sortBy === tab.key ? 'rgba(33, 150, 243, 0.2)' : '#222',
+                                color: sortBy === tab.key ? '#64b5f6' : '#aaa',
+                                fontSize: '13px',
+                                fontWeight: sortBy === tab.key ? 'bold' : 'normal',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                <div style={{ fontSize: '13px', color: '#888' }}>
+                    全 {filteredArchives.length} 件
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '10px' }}>
+                {filteredArchives.map(archive => {
+                    const canAuthorDelete = archive.authorId === userId;
+                    const showDeleteBtn = isAdmin || canAuthorDelete;
+
+                    return (
+                        <div key={archive.id} style={{
+                            background: '#222',
+                            padding: '15px',
+                            borderRadius: '12px',
+                            border: '1px solid #444',
+                            position: 'relative',
+                            transition: 'transform 0.2s ease, border-color 0.2s ease',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column'
                         }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.borderColor = '#444';
-                        }}>
-                        <Link href={`/archive/${archive.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                            {archive.imagePath && (
-                                <div style={{ position: 'relative' }}>
-                                    <img
-                                        src={archive.imagePath}
-                                        alt="Board"
-                                        style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }}
-                                    />
-                                    {isAdmin && (
-                                        <button
-                                            onClick={(e) => handleAdminDelete(e, archive.id, true)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                background: 'rgba(255,64,129,0.9)',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '4px 8px',
-                                                fontSize: '12px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer',
-                                                zIndex: 20,
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                                            }}
-                                        >
-                                            削除
-                                        </button>
-                                    )}
-                                    {archive.authorId === userId && (
-                                        <button
-                                            onClick={(e) => handleDelete(e, archive.id)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                background: 'rgba(211,47,47,0.9)',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '4px 8px',
-                                                fontSize: '12px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer',
-                                                zIndex: 20,
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                                            }}
-                                        >
-                                            削除
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={(e) => handleDownload(e, archive.imagePath!, archive.id)}
-                                        style={{
-                                            position: 'absolute',
-                                            bottom: '15px',
-                                            right: '5px',
-                                            background: 'rgba(0,0,0,0.7)',
-                                            color: '#fff',
-                                            border: '1px solid #666',
-                                            borderRadius: '4px',
-                                            padding: '4px 8px',
-                                            fontSize: '12px',
-                                            cursor: 'pointer',
-                                            zIndex: 10
-                                        }}
-                                        title={formatLog('ui_download_image')}
-                                    >
-                                        💾
-                                    </button>
-                                </div>
-                            )}
-                            <div style={{ marginTop: '5px', flex: 1 }}>
-                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#2196F3', marginBottom: '4px' }}>
-                                    {formatLog('ui_initial_setup')}
-                                </div>
-                                <div style={{ fontSize: '14px', color: '#eee', whiteSpace: 'pre-wrap', lineHeight: '1.4', marginBottom: '10px' }}>
-                                    {resolveSetupNames(archive.initialSetup) || '-'}
-                                </div>
-                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff9800', marginBottom: '4px', borderTop: '1px solid #333', paddingTop: '10px' }}>
-                                    {formatLog('ui_explanation')}
-                                </div>
-                                <div style={{ fontSize: '14px', color: '#bbb', whiteSpace: 'pre-wrap', lineHeight: '1.4', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                    {archive.explanation || '-'}
-                                </div>
-                            </div>
-                            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-5px)';
+                                e.currentTarget.style.borderColor = '#666';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.borderColor = '#444';
+                            }}>
+                            {showDeleteBtn && (
                                 <button
-                                    onClick={(e) => handleLikeAction(e, archive)}
-                                    title="いいね（Xキーを押しながらで管理者削除）"
-                                    disabled={archive.likedBy?.includes(userId)}
+                                    onClick={(e) => isAdmin && !canAuthorDelete ? handleAdminDelete(e, archive.id, true) : handleDelete(e, archive.id)}
                                     style={{
-                                        color: archive.likedBy?.includes(userId) ? '#ff4081' : '#888',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: archive.likedBy?.includes(userId) ? 'rgba(255,64,129,0.1)' : 'rgba(136,136,136,0.1)',
-                                        padding: '4px 10px',
-                                        borderRadius: '12px',
+                                        position: 'absolute',
+                                        top: '20px',
+                                        right: '20px',
+                                        background: isAdmin && !canAuthorDelete ? 'rgba(255,64,129,0.9)' : 'rgba(211,47,47,0.9)',
+                                        color: '#fff',
                                         border: 'none',
-                                        cursor: archive.likedBy?.includes(userId) ? 'default' : 'pointer',
+                                        borderRadius: '4px',
+                                        padding: '4px 8px',
                                         fontSize: '12px',
                                         fontWeight: 'bold',
-                                        transition: 'all 0.2s',
+                                        cursor: 'pointer',
+                                        zIndex: 20,
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
                                     }}
                                 >
-                                    <span style={{ fontSize: '14px' }}>{archive.likedBy?.includes(userId) ? '♥' : '♡'}</span> {archive.likes || 0}
+                                    削除
                                 </button>
-                            </div>
-                        </Link>
-                    </div>
-                ))}
+                            )}
+                            <Link href={`/archive/${archive.id}`} style={{ textDecoration: 'none', color: 'inherit', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                {archive.imagePath && (
+                                    <div style={{ position: 'relative' }}>
+                                        <img
+                                            src={archive.imagePath}
+                                            alt="Board"
+                                            style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }}
+                                        />
+                                        <button
+                                            onClick={(e) => handleDownload(e, archive.imagePath!, archive.id)}
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: '15px',
+                                                right: '5px',
+                                                background: 'rgba(0,0,0,0.7)',
+                                                color: '#fff',
+                                                border: '1px solid #666',
+                                                borderRadius: '4px',
+                                                padding: '4px 8px',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                zIndex: 10
+                                            }}
+                                            title={formatLog('ui_download_image')}
+                                        >
+                                            💾
+                                        </button>
+                                    </div>
+                                )}
+                                <div style={{ marginTop: '5px', flex: 1 }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#2196F3', marginBottom: '4px', paddingRight: (!archive.imagePath && showDeleteBtn) ? '50px' : 0 }}>
+                                        {formatLog('ui_initial_setup')}
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: '#eee', whiteSpace: 'pre-wrap', lineHeight: '1.4', marginBottom: '10px' }}>
+                                        {resolveSetupNames(archive.initialSetup) || '-'}
+                                    </div>
+                                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff9800', marginBottom: '4px', borderTop: '1px solid #333', paddingTop: '10px' }}>
+                                        {formatLog('ui_explanation')}
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: '#bbb', whiteSpace: 'pre-wrap', lineHeight: '1.4', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                        {archive.explanation || '-'}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #2d2d2d', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ fontSize: '12px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span style={{ color: '#aaa' }}>{archive.nickname || formatLog('ui_no_name') || 'Anonymous'}</span>
+                                        {archive.createdAt && (
+                                            <span style={{ marginLeft: '8px', color: '#666' }}>
+                                                {new Date(archive.createdAt).toLocaleDateString('ja-JP')}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={(e) => handleLikeAction(e, archive)}
+                                        title="いいね（Xキーを押しながらで管理者削除）"
+                                        style={{
+                                            color: archive.likedBy?.includes(userId) ? '#ff4081' : '#888',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            background: archive.likedBy?.includes(userId) ? 'rgba(255,64,129,0.1)' : 'rgba(136,136,136,0.1)',
+                                            padding: '4px 10px',
+                                            borderRadius: '12px',
+                                            border: 'none',
+                                            cursor: archive.likedBy?.includes(userId) ? 'default' : 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s',
+                                            flexShrink: 0
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '14px' }}>{archive.likedBy?.includes(userId) ? '♥' : '♡'}</span> {archive.likes || 0}
+                                    </button>
+                                </div>
+                            </Link>
+                        </div>
+                    );
+                })}
             </div>
 
             {filteredArchives.length === 0 && !loading && (

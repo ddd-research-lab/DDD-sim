@@ -20,8 +20,8 @@ export function EditArchiveModal({ isOpen, onClose, initialSetup, explanation, n
 
     useEffect(() => {
         if (isOpen) {
-            // Parse initialSetup (comma separated IDs)
-            if (initialSetup && initialSetup.includes('c')) {
+            // Parse initialSetup (comma separated IDs like c004,c005)
+            if (initialSetup && initialSetup.includes('c') && initialSetup.split(',').every(part => part.trim().match(/^c\d+$/))) {
                 setInitialSetupIds(initialSetup.split(',').map(s => s.trim()));
             } else {
                 setInitialSetupIds(['']);

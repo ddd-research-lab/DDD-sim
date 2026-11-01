@@ -60,8 +60,16 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             if (!storeState.isHistoryBatching && storeState.currentStepIndex < 0) {
                 storeState.pushHistory();
             }
-            const latestHistory = useGameStore.getState().history;
-            const latestLogs = useGameStore.getState().logs.filter(l => {
+            const updatedState = useGameStore.getState();
+            const latestHistory = (updatedState.jumpHistory.length > 0 && updatedState.jumpHistory[0].history)
+                ? updatedState.jumpHistory[0].history
+                : (updatedState.historySource && updatedState.historySource.length >= updatedState.history.length
+                    ? updatedState.historySource
+                    : updatedState.history);
+            const rawLogs = updatedState.replayOriginalLogs
+                || (updatedState.jumpHistory.length > 0 && updatedState.jumpHistory[0].logs)
+                || updatedState.logs;
+            const latestLogs = (rawLogs || []).filter(l => {
                 const isSystemJump = l.startsWith('ログ #') && l.endsWith('へジャンプ');
                 const isReturnJump = l === formatLog('log_return_from_jump');
                 const isSysNotFound = l === formatLog('log_sys_state_not_found') || l === formatLog('log_sys_already_at_step') || l === formatLog('log_undo_empty');
@@ -76,7 +84,7 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             if (compressedResult.cards) {
                 const minifiedCards: Record<string, any> = {};
                 for (const [id, card] of Object.entries(compressedResult.cards)) {
-                    const { description, pendulumEffect, name, nameJa, image, ...essentialCardData } = card as any;
+                    const { description, descriptionJa, pendulumEffect, name, nameJa, image, imageUrl, ...essentialCardData } = card as any;
                     minifiedCards[id] = essentialCardData;
                 }
                 compressedResult.cards = minifiedCards;

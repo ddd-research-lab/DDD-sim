@@ -7561,7 +7561,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     imageUrl: card.imageUrl || dbDef?.imageUrl,
                     name: card.name || dbDef?.name || '',
                     nameJa: card.nameJa || dbDef?.nameJa || '',
-                    description: card.description || dbDef?.description || ''
+                    description: card.description || dbDef?.description || '',
+                    descriptionJa: card.descriptionJa || dbDef?.descriptionJa || '',
                 };
             });
 
@@ -8499,7 +8500,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 imageUrl: card.imageUrl || dbDef?.imageUrl,
                 name: card.name || dbDef?.name || '',
                 nameJa: card.nameJa || dbDef?.nameJa || '',
-                description: card.description || dbDef?.description || ''
+                description: card.description || dbDef?.description || '',
+                descriptionJa: card.descriptionJa || dbDef?.descriptionJa || '',
             };
         });
 
@@ -8513,6 +8515,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
             isReplaying: false,
             currentStepIndex: history.length - 1,
             logs: archive.logs || initialState.logs || [],
+            replayAnimations: null,
+            activeReplayCardId: null,
+            activeReplayInstanceId: null,
+            activeReplayZone: null,
+            replayOriginalLogs: null,
+            showPendulumCutIn: false,
+            showAshBlossomCutIn: false,
+            showInfiniteImpermanenceCutIn: false,
+            showImpulseCutIn: false,
+            showDrollCutIn: false,
+            showNibiruCutIn: false,
+            showHarmoniaCutIn: false,
 
             // Clean UI
             searchState: { isOpen: false, filter: null, onSelect: null, prompt: undefined, source: undefined },

@@ -78,6 +78,7 @@ export function decompressHistory(compressed: CompressedHistory): Partial<GameSt
                 name: card.name || dbDef?.name || '',
                 nameJa: card.nameJa || dbDef?.nameJa || '',
                 description: card.description || dbDef?.description || '',
+                descriptionJa: card.descriptionJa || dbDef?.descriptionJa || '',
             };
         }
     }

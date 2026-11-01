@@ -89,7 +89,7 @@ export async function PATCH(
         const { userId, initialSetup, explanation, nickname, authorId } = body;
 
         // Determine if this is an update or a like action
-        if (initialSetup !== undefined || explanation !== undefined) {
+        if (initialSetup !== undefined || explanation !== undefined || nickname !== undefined) {
             // Update action: Verify authorId
             const { data: archive, error: fetchError } = await supabase
                 .from('archives')
