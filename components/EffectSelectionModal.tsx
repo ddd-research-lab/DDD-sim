@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { formatLog } from '@/data/locales';
 
 export function EffectSelectionModal() {
-    const { effectSelectionState, resolveEffectSelection, dialogSize, setDialogSize } = useGameStore();
+    const { effectSelectionState, resolveEffectSelection, cancelEffectSelection, dialogSize, setDialogSize } = useGameStore();
     const { isOpen: isChoosingEffect, title: effectPrompt, options: effectOptions } = effectSelectionState;
     const [isMinimized, setIsMinimized] = useState(false);
 
@@ -16,6 +17,7 @@ export function EffectSelectionModal() {
     if (!isChoosingEffect) return null;
 
     const hasImages = effectOptions.some(opt => opt.imageUrl);
+    const hasExplicitCancelOption = effectOptions.some(opt => opt.value === 'no' || opt.value === 'cancel' || opt.value === 'DONE');
 
     if (isMinimized) {
         // Floating Mini Bar/Badge on the bottom-right corner (placed higher than search bar)
@@ -25,6 +27,9 @@ export function EffectSelectionModal() {
                 bottom: '160px', // place above search bar (100px)
                 right: '20px',
                 zIndex: 2100,
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center'
             }}>
                 <button 
                     onClick={() => setIsMinimized(false)}
@@ -45,32 +50,57 @@ export function EffectSelectionModal() {
                 >
                     <span>⚡</span> {effectPrompt ? (effectPrompt.length > 12 ? effectPrompt.slice(0, 12) + '...' : effectPrompt) : '効果を選択'}
                 </button>
+                {hasImages && !hasExplicitCancelOption && (
+                    <button
+                        onClick={cancelEffectSelection}
+                        style={{
+                            width: '40px',
+                            height: '40px',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        ✕
+                    </button>
+                )}
             </div>
         );
     }
 
     // Determine dimensions based on dialogSize setting
     let modalWidth = '90%';
-    let modalMaxWidth = hasImages ? '600px' : '350px';
+    let modalMaxWidth = hasImages ? '680px' : '350px';
     let contentMaxHeight = '70vh';
     let paddingSize = '20px';
     let buttonPadding = '10px 15px';
     let fontSize = '14px';
+    let minCardColumnWidth = '135px';
 
     if (dialogSize === 'small') {
         modalWidth = '65%';
-        modalMaxWidth = hasImages ? '420px' : '260px';
-        contentMaxHeight = '48vh';
+        modalMaxWidth = hasImages ? '480px' : '260px';
+        contentMaxHeight = '52vh';
         paddingSize = '12px';
         buttonPadding = '6px 10px';
         fontSize = '12px';
+        minCardColumnWidth = '105px';
     } else if (dialogSize === 'large') {
         modalWidth = '95%';
-        modalMaxWidth = hasImages ? '750px' : '450px';
+        modalMaxWidth = hasImages ? '840px' : '450px';
         contentMaxHeight = '82vh';
         paddingSize = '28px';
         buttonPadding = '14px 20px';
         fontSize = '16px';
+        minCardColumnWidth = '165px';
     }
 
     return (
@@ -169,20 +199,22 @@ export function EffectSelectionModal() {
 
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: hasImages ? 'repeat(auto-fit, minmax(100px, 1fr))' : '1fr',
-                    gap: '10px',
+                    gridTemplateColumns: hasImages ? `repeat(auto-fit, minmax(${minCardColumnWidth}, 180px))` : '1fr',
+                    gap: '12px',
                     justifyContent: 'center'
                 }}>
                     {effectOptions.map((opt) => (
                         <button
                             key={opt.value}
                             disabled={opt.disabled}
+                            title={opt.label}
                             onClick={() => !opt.disabled && resolveEffectSelection(opt.value)}
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '10px',
+                                justifyContent: opt.imageUrl ? 'space-between' : 'center',
+                                gap: '8px',
                                 padding: opt.imageUrl ? '10px' : buttonPadding,
                                 background: opt.disabled ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)',
                                 color: opt.disabled ? '#777' : 'white',
@@ -212,19 +244,49 @@ export function EffectSelectionModal() {
                             }}
                         >
                             {opt.imageUrl && (
-                                <img
-                                    src={opt.imageUrl}
-                                    alt={opt.label}
-                                    style={{
-                                        width: '100%',
-                                        aspectRatio: '0.7',
-                                        objectFit: 'cover',
-                                        borderRadius: '6px',
-                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
-                                    }}
-                                />
+                                <div style={{ position: 'relative', width: '100%' }}>
+                                    <img
+                                        src={opt.imageUrl}
+                                        alt={opt.label}
+                                        style={{
+                                            width: '100%',
+                                            aspectRatio: '0.7',
+                                            objectFit: 'cover',
+                                            borderRadius: '6px',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+                                            filter: opt.disabled ? 'grayscale(80%)' : 'none'
+                                        }}
+                                    />
+                                    {opt.count && opt.count > 1 && (
+                                        <span style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            right: '6px',
+                                            background: 'rgba(16, 185, 129, 0.92)',
+                                            color: '#fff',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            padding: '2px 7px',
+                                            borderRadius: '999px',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                                        }}>
+                                            ×{opt.count}
+                                        </span>
+                                    )}
+                                </div>
                             )}
-                            <span style={{ fontWeight: '500', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{opt.label}</span>
+                            <span style={{
+                                fontWeight: '500',
+                                display: opt.imageUrl ? '-webkit-box' : 'block',
+                                WebkitLineClamp: opt.imageUrl ? 2 : undefined,
+                                WebkitBoxOrient: opt.imageUrl ? 'vertical' : undefined,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: opt.imageUrl ? 'normal' : 'nowrap',
+                                lineHeight: opt.imageUrl ? '1.3' : undefined,
+                                fontSize: opt.imageUrl ? (dialogSize === 'small' ? '11px' : '12px') : fontSize,
+                                width: '100%'
+                            }}>{opt.label}</span>
                             <div className="shiny-overlay" style={{
                                 position: 'absolute',
                                 top: 0,
@@ -239,7 +301,30 @@ export function EffectSelectionModal() {
                         </button>
                     ))}
                 </div>
+
+                {hasImages && !hasExplicitCancelOption && (
+                    <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'center' }}>
+                        <button
+                            onClick={cancelEffectSelection}
+                            style={{
+                                padding: '8px 24px',
+                                cursor: 'pointer',
+                                background: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.25)',
+                                transition: 'opacity 0.2s'
+                            }}
+                        >
+                            {formatLog('ui_cancel')}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
+

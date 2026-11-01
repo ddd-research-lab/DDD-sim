@@ -1559,8 +1559,12 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         if (currentStore.turnEffectUsage['c015_effect']) return;
 
         if (currentStore.graveyard.includes(selfId)) {
-            const hasOtherDD = currentStore.graveyard.some((id: string) => id !== selfId && isDDArchetype(currentStore.cards[id]));
-            if (!hasOtherDD) return;
+            const otherDDMonstersInGy = currentStore.graveyard.filter((id: string) => {
+                if (id === selfId) return false;
+                const c = currentStore.cards[id];
+                return c && isDDArchetype(c) && c.type === 'MONSTER';
+            });
+            if (otherDDMonstersInGy.length === 0) return;
 
             store.startEffectSelection(formatLog('prompt_necro_slime_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
                 const s = useGameStore.getState();
@@ -1570,17 +1574,31 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     // Check usage again inside callback to be safe
                     if (s.turnEffectUsage['c015_effect']) return;
 
-                    const fusionOptions = s.extraDeck
-                        .filter((id: string) => {
-                            const c = s.cards[id];
-                            return c.subType?.includes('FUSION') && c.name.includes('DDD') && c.cardId !== 'c029';
-                        }).map((id: string) => ({
-                            label: getCardName(s.cards[id], s.language),
-                            value: id,
-                            imageUrl: s.cards[id].imageUrl
-                        }));
+                    const getEffLv = (id: string) => s.cardPropertyModifiers[id]?.level ?? s.cards[id]?.level ?? 0;
+                    const selfLv = getEffLv(selfId);
+                    const hasLv5Partner = otherDDMonstersInGy.some((id: string) => getEffLv(id) >= 5);
+                    const canSummonHighKingGenghis = selfLv >= 5 || hasLv5Partner;
 
-                    if (fusionOptions.length === 0) {
+                    const seenCardIds = new Set<string>();
+                    const fusionOptions: { label: string; value: string; imageUrl?: string; disabled?: boolean; count?: number }[] = [];
+                    s.extraDeck.forEach((id: string) => {
+                        const c = s.cards[id];
+                        if (!c || !c.subType?.includes('FUSION') || !c.name.includes('DDD') || c.cardId === 'c029' || c.faceUp) return;
+                        if (seenCardIds.has(c.cardId)) return;
+                        seenCardIds.add(c.cardId);
+
+                        const copyCount = s.extraDeck.filter((eid: string) => s.cards[eid]?.cardId === c.cardId && !s.cards[eid]?.faceUp).length;
+                        const isDisabled = c.cardId === 'c019' && !canSummonHighKingGenghis;
+                        fusionOptions.push({
+                            label: getCardName(c, s.language),
+                            value: id,
+                            imageUrl: c.imageUrl,
+                            disabled: isDisabled,
+                            count: copyCount
+                        });
+                    });
+
+                    if (fusionOptions.length === 0 || fusionOptions.every(o => o.disabled)) {
                         s.addLog(formatLog('log_no_fusion_in_ex'));
                         return;
                     }
@@ -1648,9 +1666,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 }
                             },
                             formatLog('prompt_select_material'),
-                            s.graveyard
+                            s2.graveyard
                         );
-                    }, false, selfId);
+                    });
                 }
             }, false, selfId);
         }
@@ -1925,54 +1943,116 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
     'c006': (store, selfId, fromLocation) => {
         if (store.spellTrapZones.includes(selfId)) {
             if (fromLocation) return;
-            const fusionOptions = store.extraDeck
-                .filter((id: string) => store.cards[id].subType?.includes('FUSION') && store.cards[id].cardId !== 'c029')
-                .map((id: string) => ({
-                    label: getCardName(store.cards[id], store.language),
-                    value: id,
-                    imageUrl: store.cards[id].imageUrl
-                }));
 
-            if (fusionOptions.length === 0) {
+            const getSwampCandidates = (s: GameState, isDD: boolean) => {
+                const rawPool = [
+                    ...s.hand,
+                    ...s.monsterZones.filter((id: string | null): id is string => id !== null && !s.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                    ...s.extraMonsterZones.filter((id: string | null): id is string => id !== null && !s.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                    ...(isDD ? s.graveyard : [])
+                ];
+                return rawPool.filter((id: string) => {
+                    const c = s.cards[id];
+                    return c && isDDArchetype(c) && c.type === 'MONSTER' && !s.cardFlags[id]?.includes('isHarmoniaPlaced');
+                });
+            };
+
+            const buildFusionOptions = (s: GameState) => {
+                const seenCardIds = new Set<string>();
+                const opts: { label: string; value: string; imageUrl?: string; disabled?: boolean; count?: number }[] = [];
+                s.extraDeck.forEach((id: string) => {
+                    const c = s.cards[id];
+                    if (!c || !c.subType?.includes('FUSION') || c.cardId === 'c029' || c.faceUp) return;
+                    if (seenCardIds.has(c.cardId)) return;
+                    seenCardIds.add(c.cardId);
+
+                    const copyCount = s.extraDeck.filter((eid: string) => s.cards[eid]?.cardId === c.cardId && !s.cards[eid]?.faceUp).length;
+                    const candidates = getSwampCandidates(s, isDDArchetype(c));
+                    const hasEnoughMats = candidates.length >= 2;
+                    const hasLv5Mat = candidates.some((cid: string) => (s.cardPropertyModifiers[cid]?.level ?? s.cards[cid]?.level ?? 0) >= 5);
+                    const isDisabled = !hasEnoughMats || (c.cardId === 'c019' && !hasLv5Mat);
+
+                    opts.push({
+                        label: getCardName(c, s.language),
+                        value: id,
+                        imageUrl: c.imageUrl,
+                        disabled: isDisabled,
+                        count: copyCount
+                    });
+                });
+                return opts;
+            };
+
+            const initialFusionOptions = buildFusionOptions(store);
+            if (initialFusionOptions.length === 0) {
                 store.addLog(formatLog('log_no_fusion_in_ex'));
+                return;
+            }
+            if (initialFusionOptions.every(o => o.disabled)) {
+                store.addLog(formatLog('log_error_material'));
                 return;
             }
 
             store.startEffectSelection(formatLog('prompt_swamp_king_fusion'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string, isNegated?: boolean) => {
-                if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c006'); return; }
+                const s = useGameStore.getState();
+                if (choice === 'yes' && isNegated) { s.addTurnEffectUsage('c006'); return; }
                 if (isNegated) return;
                 if (choice === 'yes') {
-                    store.startEffectSelection(formatLog('label_fusion_monster_select'), fusionOptions, (fusionId: string) => {
-                        const fusionCard = store.cards[fusionId];
+                    const fusionOptions = buildFusionOptions(s);
+                    if (fusionOptions.length === 0 || fusionOptions.every(o => o.disabled)) {
+                        s.addLog(formatLog('log_error_material'));
+                        return;
+                    }
+
+                    s.startEffectSelection(formatLog('label_fusion_monster_select'), fusionOptions, (fusionId: string) => {
+                        const sNow = useGameStore.getState();
+                        const fusionCard = sNow.cards[fusionId];
+                        if (!fusionCard) return;
                         const isDD = isDDArchetype(fusionCard);
                         const locs = isDD ? ['HAND', 'MONSTER_ZONE', 'GRAVEYARD'] : ['HAND', 'MONSTER_ZONE'];
                         const sourceList = [
-                            ...store.hand,
-                            ...store.monsterZones.filter((id: string | null): id is string => id !== null && !store.cardFlags[id]?.includes('isHarmoniaPlaced')),
-                            ...store.extraMonsterZones.filter((id: string | null): id is string => id !== null && !store.cardFlags[id]?.includes('isHarmoniaPlaced')),
-                            ...(isDD ? store.graveyard : [])
+                            ...sNow.hand,
+                            ...sNow.monsterZones.filter((id: string | null): id is string => id !== null && !sNow.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                            ...sNow.extraMonsterZones.filter((id: string | null): id is string => id !== null && !sNow.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                            ...(isDD ? sNow.graveyard : [])
                         ];
                         const checkLoc = (id: string) => {
-                            if (store.hand.includes(id)) return 'HAND';
-                            if (store.monsterZones.includes(id) || store.extraMonsterZones.includes(id)) return 'MONSTER_ZONE';
-                            if (store.graveyard.includes(id)) return 'GRAVEYARD';
+                            const st = useGameStore.getState();
+                            if (st.hand.includes(id)) return 'HAND';
+                            if (st.monsterZones.includes(id) || st.extraMonsterZones.includes(id)) return 'MONSTER_ZONE';
+                            if (st.graveyard.includes(id)) return 'GRAVEYARD';
                             return null;
                         };
-                        const matFilter = (c: any) => isDDArchetype(c) && c.type === 'MONSTER' && !store.cardFlags[c.id]?.includes('isHarmoniaPlaced');
+                        const matFilter = (c: any) => {
+                            const st = useGameStore.getState();
+                            return isDDArchetype(c) && c.type === 'MONSTER' && !st.cardFlags[c.id]?.includes('isHarmoniaPlaced');
+                        };
+                        const isHighKingGenghis = fusionCard.cardId === 'c019';
 
-                        store.startSearch(
+                        sNow.startSearch(
                             (c: any) => {
                                 const loc = checkLoc(c.id);
                                 if (!loc || !locs.includes(loc)) return false;
-                                return matFilter(c);
+                                if (!matFilter(c)) return false;
+                                if (isHighKingGenghis) {
+                                    const st = useGameStore.getState();
+                                    const cLv = st.cardPropertyModifiers[c.id]?.level ?? c.level ?? 0;
+                                    if (cLv >= 5) return true;
+                                    // Allow selecting a <5 monster first only if another Level 5+ DD monster exists in the remaining pool
+                                    return sourceList.some((otherId: string) => {
+                                        if (otherId === c.id) return false;
+                                        const otherCard = st.cards[otherId];
+                                        if (!otherCard || !matFilter(otherCard)) return false;
+                                        const otherLv = st.cardPropertyModifiers[otherId]?.level ?? otherCard.level ?? 0;
+                                        return otherLv >= 5;
+                                    });
+                                }
+                                return true;
                             },
                             (mat1: string) => {
                                 const remainingSource = sourceList.filter((id: string) => id !== mat1);
-                                // High King Genghis (c019) requirement: At least one material must be Level 5+
-                                const isHighKingGenghis = fusionCard.cardId === 'c019';
-                                const mat1Level = store.cards[mat1].level || 0;
 
-                                store.startSearch(
+                                useGameStore.getState().startSearch(
                                     (c: any) => {
                                         const loc = checkLoc(c.id);
                                         if (!loc || !locs.includes(loc)) return false;
@@ -1980,17 +2060,16 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
 
                                         // Requirement check for c019: One material must be Level 5+
                                         if (isHighKingGenghis) {
-                                            const m1Mods = store.cardPropertyModifiers[mat1];
-                                            const m2Mods = store.cardPropertyModifiers[c.id];
-                                            const m1Lv = m1Mods?.level ?? store.cards[mat1].level ?? 0;
+                                            const st = useGameStore.getState();
+                                            const m1Mods = st.cardPropertyModifiers[mat1];
+                                            const m2Mods = st.cardPropertyModifiers[c.id];
+                                            const m1Lv = m1Mods?.level ?? st.cards[mat1].level ?? 0;
                                             const m2Lv = m2Mods?.level ?? c.level ?? 0;
                                             return m1Lv >= 5 || m2Lv >= 5;
                                         }
                                         return true;
                                     },
                                     (mat2: string) => {
-                                        const card1 = store.cards[mat1];
-                                        const card2 = store.cards[mat2];
                                         const m1Loc = checkLoc(mat1);
                                         const m2Loc = checkLoc(mat2);
 
@@ -2005,15 +2084,16 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         if (m2Loc) useGameStore.getState().moveCard(mat2, m2Final, 0, m2Loc, true);
                                         useGameStore.setState({ isMaterialMove: false });
 
-                                        const emptyIndices = store.monsterZones.map((v: string | null, i: number) => (v === null || v === mat1 || v === mat2) ? i : -1).filter((i: number) => i !== -1);
+                                        const stAfterMats = useGameStore.getState();
+                                        const emptyIndices = stAfterMats.monsterZones.map((v: string | null, i: number) => (v === null || v === mat1 || v === mat2) ? i : -1).filter((i: number) => i !== -1);
                                         if (emptyIndices.length > 0) {
-                                            store.startZoneSelection(formatLog('prompt_select_zone_fusion'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
-                                                const s = useGameStore.getState();
-                                                const name1 = getCardName(s.cards[mat1], s.language);
-                                                const name2 = getCardName(s.cards[mat2], s.language);
-                                                s.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}:swamp`);
+                                            stAfterMats.startZoneSelection(formatLog('prompt_select_zone_fusion'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
+                                                const sFinal = useGameStore.getState();
+                                                const name1 = getCardName(sFinal.cards[mat1], sFinal.language);
+                                                const name2 = getCardName(sFinal.cards[mat2], sFinal.language);
+                                                sFinal.moveCard(fusionId, 'MONSTER_ZONE', i, undefined, false, true, `mats:${name1}＋${name2}:swamp`);
 
-                                                store.addTurnEffectUsage('c006');
+                                                sFinal.addTurnEffectUsage('c006');
                                                 useGameStore.getState().pushHistory(true);
                                             });
                                         }
@@ -2025,7 +2105,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             formatLog('prompt_select_material'),
                             sourceList
                         );
-                    }, false, selfId);
+                    });
                 }
             }, false, selfId);
         }
@@ -2354,55 +2434,123 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         // Manual Trigger in Monster Zone
         if (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) {
             if (fromLocation) return; // Prevent Auto-Trigger on Summon
+
+            const getAlfredCandidates = (s: GameState) => {
+                const rawPool = [
+                    ...s.monsterZones.filter((id: string | null): id is string => id !== null && !s.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                    ...s.extraMonsterZones.filter((id: string | null): id is string => id !== null && !s.cardFlags[id]?.includes('isHarmoniaPlaced')),
+                    ...s.banished
+                ];
+                return rawPool.filter((id: string) => {
+                    const c = s.cards[id];
+                    return c && isDDArchetype(c) && c.type === 'MONSTER' && !s.cardFlags[id]?.includes('isHarmoniaPlaced');
+                });
+            };
+
+            const buildAlfredFusionOptions = (s: GameState) => {
+                const candidates = getAlfredCandidates(s);
+                const hasEnoughMats = candidates.length >= 2;
+                const hasLv5Mat = candidates.some((cid: string) => (s.cardPropertyModifiers[cid]?.level ?? s.cards[cid]?.level ?? 0) >= 5);
+
+                const seenCardIds = new Set<string>();
+                const opts: { label: string; value: string; imageUrl?: string; disabled?: boolean; count?: number }[] = [];
+                s.extraDeck.forEach((id: string) => {
+                    const card = s.cards[id];
+                    if (!card || card.type !== 'MONSTER' || !card.subType?.includes('FUSION') || card.cardId === 'c029' || !isDDArchetype(card) || card.faceUp) return;
+                    if (seenCardIds.has(card.cardId)) return;
+                    seenCardIds.add(card.cardId);
+
+                    const copyCount = s.extraDeck.filter((eid: string) => s.cards[eid]?.cardId === card.cardId && !s.cards[eid]?.faceUp).length;
+                    const isDisabled = !hasEnoughMats || (card.cardId === 'c019' && !hasLv5Mat);
+
+                    opts.push({
+                        label: getCardName(card, s.language),
+                        value: card.id,
+                        imageUrl: card.imageUrl,
+                        disabled: isDisabled,
+                        count: copyCount
+                    });
+                });
+                return opts;
+            };
+
+            const initialCandidates = getAlfredCandidates(store);
+            if (initialCandidates.length < 2) {
+                store.addLog(formatLog('log_error_material'));
+                return;
+            }
+            const initialFusionOptions = buildAlfredFusionOptions(store);
+            if (initialFusionOptions.length === 0) {
+                store.addLog(formatLog('log_no_fusion_in_ex'));
+                return;
+            }
+            if (initialFusionOptions.every(o => o.disabled)) {
+                store.addLog(formatLog('log_error_material'));
+                return;
+            }
+
             store.startEffectSelection(
                 formatLog('prompt_alfred_fusion'),
                 [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }],
                 (choice: string, isNegated?: boolean) => {
-                    if (choice === 'yes' && isNegated) { store.addTurnEffectUsage('c027'); return; }
+                    const s = useGameStore.getState();
+                    if (choice === 'yes' && isNegated) { s.addTurnEffectUsage('c027'); return; }
                     if (isNegated) return;
                     if (choice === 'yes') {
-                        // Select Fusion Monster
-                        store.startEffectSelection(
+                        const fusionOptions = buildAlfredFusionOptions(s);
+                        if (fusionOptions.length === 0 || fusionOptions.every(o => o.disabled)) {
+                            s.addLog(formatLog('log_error_material'));
+                            return;
+                        }
+
+                        // Select Fusion Monster (no activatorId here so handtraps aren't injected into the fusion monster grid)
+                        s.startEffectSelection(
                             formatLog('label_fusion_monster_select'),
-                            store.extraDeck
-                                .map((id: string) => store.cards[id])
-                                .filter((card: any) => card.type === 'MONSTER' && card.subType?.includes('FUSION') && card.cardId !== 'c029' && isDDArchetype(card))
-                                .map((card: any) => ({
-                                    label: getCardName(card, store.language),
-                                    value: card.id,
-                                    imageUrl: card.imageUrl
-                                })),
+                            fusionOptions,
                             (fusionId: string) => {
-                                // Source: Field (Monster Zones, EMZ), Banished ONLY
-                                const candidates = [
-                                    ...store.monsterZones.filter((id: string | null): id is string => id !== null),
-                                    ...store.extraMonsterZones.filter((id: string | null): id is string => id !== null),
-                                    ...store.banished
-                                ].filter(id => id !== null) as string[];
+                                const sNow = useGameStore.getState();
+                                const candidates = getAlfredCandidates(sNow);
 
                                 if (candidates.length < 2) {
-                                    store.addLog(formatLog('log_error_material'));
+                                    sNow.addLog(formatLog('log_error_material'));
                                     return;
                                 }
 
-                                const fusionCard = store.cards[fusionId];
+                                const fusionCard = sNow.cards[fusionId];
+                                if (!fusionCard) return;
                                 const isHighKingGenghis = fusionCard.cardId === 'c019';
 
-                                store.startSearch(
-                                    (card: any) => candidates.includes(card.id) && isDDArchetype(card) && card.type === 'MONSTER',
+                                sNow.startSearch(
+                                    (card: any) => {
+                                        if (!candidates.includes(card.id) || !isDDArchetype(card) || card.type !== 'MONSTER') return false;
+                                        const st = useGameStore.getState();
+                                        if (st.cardFlags[card.id]?.includes('isHarmoniaPlaced')) return false;
+                                        if (isHighKingGenghis) {
+                                            const cLv = st.cardPropertyModifiers[card.id]?.level ?? card.level ?? 0;
+                                            if (cLv >= 5) return true;
+                                            return candidates.some((otherId: string) => {
+                                                if (otherId === card.id) return false;
+                                                const otherCard = st.cards[otherId];
+                                                if (!otherCard || st.cardFlags[otherId]?.includes('isHarmoniaPlaced')) return false;
+                                                const otherLv = st.cardPropertyModifiers[otherId]?.level ?? otherCard.level ?? 0;
+                                                return otherLv >= 5;
+                                            });
+                                        }
+                                        return true;
+                                    },
                                     (mat1Id: string) => {
-                                        const mat1Level = store.cards[mat1Id].level || 0;
                                         const remaining = candidates.filter((id: string) => id !== mat1Id);
-                                        store.startSearch(
+                                        useGameStore.getState().startSearch(
                                             (card: any) => {
                                                 if (!remaining.includes(card.id)) return false;
                                                 if (!isDDArchetype(card) || card.type !== 'MONSTER') return false;
+                                                const st = useGameStore.getState();
+                                                if (st.cardFlags[card.id]?.includes('isHarmoniaPlaced')) return false;
                                                 // High King Genghis requirement: One material must be Level 5+
                                                 if (isHighKingGenghis) {
-                                                    const s = useGameStore.getState();
-                                                    const m1Mods = s.cardPropertyModifiers[mat1Id];
-                                                    const m2Mods = s.cardPropertyModifiers[card.id];
-                                                    const m1Lv = m1Mods?.level ?? s.cards[mat1Id].level ?? 0;
+                                                    const m1Mods = st.cardPropertyModifiers[mat1Id];
+                                                    const m2Mods = st.cardPropertyModifiers[card.id];
+                                                    const m1Lv = m1Mods?.level ?? st.cards[mat1Id].level ?? 0;
                                                     const m2Lv = m2Mods?.level ?? card.level ?? 0;
                                                     return m1Lv >= 5 || m2Lv >= 5;
                                                 }
@@ -2414,6 +2562,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                 const mat2Name = getCardName(sMats.cards[mat2Id], sMats.language);
                                                 const sourceName = getCardName(sMats.cards[selfId], sMats.language);
                                                 const matsString = `mats:${mat1Name}＋${mat2Name}：${sourceName}効果`;
+                                                const materialFromEMZ = sMats.extraMonsterZones.includes(mat1Id) || sMats.extraMonsterZones.includes(mat2Id);
 
                                                 // Execute Fusion
                                                 [mat1Id, mat2Id].forEach((id: string) => {
@@ -2438,28 +2587,28 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                                     return;
                                                 }
 
-                                                store.startZoneSelection(
+                                                freshState.startZoneSelection(
                                                     formatLog('prompt_select_zone_fusion'),
                                                     (t: string, i: number) => {
-                                                        const s = useGameStore.getState();
+                                                        const st = useGameStore.getState();
                                                         if (t === 'MONSTER_ZONE') {
-                                                            return s.monsterZones[i] === null;
+                                                            return st.monsterZones[i] === null;
                                                         }
                                                         if (t === 'EXTRA_MONSTER_ZONE') {
                                                             // EMZ Rule: Can only use EMZ if:
                                                             // 1. Both EMZs are empty, OR
                                                             // 2. A material was on EMZ (freeing it up)
-                                                            const materialFromEMZ = s.extraMonsterZones.includes(mat1Id) || s.extraMonsterZones.includes(mat2Id);
-                                                            const emzOccupied = s.extraMonsterZones[0] !== null || s.extraMonsterZones[1] !== null;
+                                                            const emzOccupied = st.extraMonsterZones[0] !== null || st.extraMonsterZones[1] !== null;
 
                                                             if (emzOccupied && !materialFromEMZ) return false;
-                                                            return s.extraMonsterZones[i] === null;
+                                                            return st.extraMonsterZones[i] === null;
                                                         }
                                                         return false;
                                                     },
                                                     (zoneType: ZoneType, zoneIndex: number) => {
-                                                        store.moveCard(fusionId, zoneType, zoneIndex, 'EXTRA_DECK', false, true, matsString);
-                                                        store.addTurnEffectUsage('c027');
+                                                        const sFinal = useGameStore.getState();
+                                                        sFinal.moveCard(fusionId, zoneType, zoneIndex, 'EXTRA_DECK', false, true, matsString);
+                                                        sFinal.addTurnEffectUsage('c027');
                                                         useGameStore.getState().pushHistory(true);
                                                     }
                                                 );
@@ -2471,7 +2620,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     formatLog('prompt_select_material'),
                                     candidates
                                 );
-                            }, false, selfId
+                            }
                         );
                     }
                 },
@@ -3304,7 +3453,7 @@ interface GameStore extends GameState {
     effectSelectionState: {
         isOpen: boolean;
         title: string;
-        options: { label: string; value: string; imageUrl?: string; disabled?: boolean }[];
+        options: { label: string; value: string; imageUrl?: string; disabled?: boolean; count?: number }[];
         onSelect: ((value: string) => void) | null;
     };
 
@@ -3365,7 +3514,7 @@ interface GameStore extends GameState {
     resolveXyzSummon: (xyzCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
     resolveLinkSummon: (linkCardId: string, materialIds: string[], toZoneType: ZoneType, toZoneIndex: number) => void;
     
-    startEffectSelection: (prompt: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string }[], onChoice: (val: string, isNegated?: boolean) => void, canAshBlossom?: boolean, activatorId?: string) => void;
+    startEffectSelection: (prompt: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string, count?: number }[], onChoice: (val: string, isNegated?: boolean) => void, canAshBlossom?: boolean, activatorId?: string) => void;
     resolveEffectSelection: (val: string) => void;
 
     startTargeting: (filter: (card: Card) => boolean, onSelect: (cardId: string) => void, mode?: 'normal' | 'red') => void;
@@ -6385,7 +6534,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
     },
 
-    startEffectSelection: (title: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string }[], onSelect: (choice: string, isNegated?: boolean) => void, canAshBlossom = false, activatorId?: string) => {
+    startEffectSelection: (title: string, options: { label: string, value: string, disabled?: boolean, imageUrl?: string, count?: number }[], onSelect: (choice: string, isNegated?: boolean) => void, canAshBlossom = false, activatorId?: string) => {
         set({ isEffectActivated: true });
         const execute = () => {
             const currentOptions = [...options];
