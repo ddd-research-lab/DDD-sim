@@ -143,7 +143,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
                 ${isTargeting && !isValidTarget ? 'opacity-50 grayscale' : ''}
                 ${isSelected ? 'ring-4 ring-blue-500' : ''}
                 ${isDragging ? 'opacity-50' : ''}
-                ${isReplaying && activeEffectCardId === card.id ? 'cyber-glitch-active' : 'hover:scale-105'}
+                ${isReplaying && (activeEffectCardId === card.id || isActiveReplayEffectCard) ? 'cyber-glitch-active' : 'hover:scale-105'}
                 ${isActiveReplayEffectCard ? 'active-effect-glow' : ''}
             `}
             // Removed transition-all duration-200 to let framer motion handle it
@@ -170,7 +170,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
             ))}
 
             {/* Cyber Glitch Effect Element (Rendered on top of materials) */}
-            {isReplaying && activeEffectCardId === card.id && (
+            {isReplaying && (activeEffectCardId === card.id || isActiveReplayEffectCard) && (
                 <div className="cyber-glitch-inner"></div>
             )}
 

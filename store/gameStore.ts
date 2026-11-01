@@ -3811,8 +3811,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // If we reach here, the Queue is empty and UI is not busy.
         // Release the Global Lock.
         if (state.isEffectActivated) {
-            useGameStore.setState({ isEffectActivated: false, activeEffectCardId: null, isHistoryBatching: false });
+            useGameStore.setState({ isEffectActivated: false, isHistoryBatching: false });
             get().pushHistory();
+            useGameStore.setState({ activeEffectCardId: null });
         }
     },
 
@@ -6788,11 +6789,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
         }
 
-        // Highlight for Replay
-        set({ activeEffectCardId: cardId });
+        // Save pre-effect state for Undo and set activeEffectCardId for Replay
         get().pushHistory();
-        set({ activeEffectCardId: null });
-        get().pushHistory(); // Force clear highlight snapshot for Replay
+        set({ activeEffectCardId: cardId });
 
         const { hand, normalSummonUsed, monsterZones, extraMonsterZones } = get();
 
@@ -6917,8 +6916,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Finalize highlight if no async/UI logic was triggered
         if (!get().effectSelectionState.isOpen && !get().targetingState.isOpen && !get().searchState.isOpen && !get().zoneSelectionState.isOpen) {
-            set({ activeEffectCardId: null });
             get().pushHistory();
+            set({ activeEffectCardId: null });
         }
     },
 
@@ -7000,6 +6999,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 impulseUsed: state.impulseUsed,
                 selectedDeckCardId: state.selectedDeckCardId,
                 beyondLockActive: state.beyondLockActive,
+                ftkModeActive: state.ftkModeActive,
+                opponentLp: state.opponentLp,
+                ftkVictory: state.ftkVictory,
             };
 
             const newHistory = [...(state.history || []), snapshot];
@@ -7541,6 +7543,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 useGradient: freshState.useGradient,
                 ashBlossomUsed: freshState.ashBlossomUsed,
                 infiniteImpermanenceUsed: freshState.infiniteImpermanenceUsed,
+                ftkModeActive: freshState.ftkModeActive,
+                opponentLp: freshState.opponentLp,
+                ftkVictory: freshState.ftkVictory,
                 history: fullHistory
             };
 
@@ -7605,42 +7610,74 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setReplaySpeed: (speed) => set({ replaySpeed: speed }),
     setActiveEffectCard: (cardId) => set({ activeEffectCardId: cardId }),
     stopReplay: () => {
-        const state = get();
         set({
             isReplaying: false,
+            activeEffectCardId: null,
+            showPendulumCutIn: false,
+            showAshBlossomCutIn: false,
+            showInfiniteImpermanenceCutIn: false,
+            showImpulseCutIn: false,
+            showDrollCutIn: false,
+            showNibiruCutIn: false,
+            showHarmoniaCutIn: false,
             replayAnimations: null,
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
-            ...(state.replayOriginalLogs ? { logs: state.replayOriginalLogs, replayOriginalLogs: null } : {})
         });
     },
     replay: async (startIndex?: number, skipSnapshot = false) => {
         const state = get();
         if (state.isReplaying) return;
 
-        // Get complete history
-        const fullHistory = (state.jumpHistory.length > 0 && state.jumpHistory[0].history)
-            ? state.jumpHistory[0].history
-            : (state.historySource || state.history || []);
-
-        if (fullHistory.length === 0) return;
-
         // Ensure the latest action is captured in history before starting replay if not jumping/replaying
         if (typeof startIndex !== 'number' && state.currentStepIndex < 0 && !skipSnapshot && !state.isHistoryBatching) {
             get().pushHistory();
         }
 
-        // Store current visual settings to maintain them during replay
-        const currentBgColor = state.backgroundColor;
-        const currentFieldColor = state.fieldColor;
-        const currentUseGradient = state.useGradient;
+        const freshState = get();
 
-        // Store original logs so we don't accidentally wipe them out during replay steps
-        const originalLogs = state.replayOriginalLogs
-            || (state.jumpHistory.length > 0 && state.jumpHistory[0].logs)
+        // Get complete history
+        const fullHistory = (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].history)
+            ? freshState.jumpHistory[0].history
+            : (freshState.historySource || freshState.history || []);
+
+        if (fullHistory.length === 0) return;
+
+        const errorLogStr = formatLog('log_error_condition');
+        const materialLogStr = formatLog('log_error_material');
+        const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+        const returnFromJumpLogStr = formatLog('log_return_from_jump');
+        const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+        const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+        const undoEmptyLogStr = formatLog('log_undo_empty');
+        const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
+
+        const isSystemOrErrorLog = (l: string) => {
+            const isError = l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr;
+            const isSystem = l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr || (l.startsWith('ログ #') && l.endsWith('へジャンプ'));
+            const isHopt = l.includes(hoptSuffix);
+            return isError || isSystem || isHopt;
+        };
+
+        const getStepLogCount = (s: any): number => {
+            if (!s) return 0;
+            if (typeof s.logCount === 'number') return s.logCount;
+            if (Array.isArray(s.logs)) return s.logs.filter((l: string) => !isSystemOrErrorLog(l)).length;
+            return 0;
+        };
+
+        // Store current visual settings to maintain them during replay
+        const currentBgColor = freshState.backgroundColor;
+        const currentFieldColor = freshState.fieldColor;
+        const currentUseGradient = freshState.useGradient;
+
+        // Store original logs (excluding transient system/jump logs) so we don't accidentally wipe them out during replay steps
+        const rawOriginalLogs = freshState.replayOriginalLogs
+            || (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].logs)
             || fullHistory[fullHistory.length - 1]?.logs
-            || [...state.logs];
+            || [...freshState.logs];
+        const originalLogs = rawOriginalLogs.filter((l: string) => !isSystemOrErrorLog(l));
 
         // Chronological logs (oldest to newest) for accurate step slicing
         const chronologicalLogs = [...originalLogs].reverse();
@@ -7649,24 +7686,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
         let startStep = 0;
         if (typeof startIndex === 'number') {
             startStep = Math.max(0, Math.min(startIndex, fullHistory.length - 1));
-        } else if (state.currentStepIndex >= 0 && state.currentStepIndex < fullHistory.length - 1) {
-            startStep = state.currentStepIndex;
+        } else if (freshState.currentStepIndex >= 0 && freshState.currentStepIndex < fullHistory.length - 1) {
+            startStep = freshState.currentStepIndex;
         }
 
         const isResumingFromMid = startStep > 0;
         const initialLogCount = isResumingFromMid
-            ? (fullHistory[startStep]?.logCount || fullHistory[startStep]?.logs?.length || 0)
-            : 0;
-        const initialLogs = isResumingFromMid
-            ? chronologicalLogs.slice(0, initialLogCount).reverse()
-            : [];
+            ? getStepLogCount(fullHistory[startStep])
+            : getStepLogCount(fullHistory[0]);
+        const initialLogs = chronologicalLogs.slice(0, initialLogCount).reverse();
 
         set({
+            ...(isResumingFromMid ? fullHistory[startStep] : fullHistory[0]),
+            backgroundColor: currentBgColor,
+            fieldColor: currentFieldColor,
+            useGradient: currentUseGradient,
             isReplaying: true,
             logs: initialLogs,
             currentStepIndex: startStep,
             replayOriginalLogs: originalLogs,
-            historySource: fullHistory
+            historySource: fullHistory,
+            replayAnimations: null,
+            activeReplayCardId: null,
+            activeReplayInstanceId: null,
+            activeReplayZone: null,
         });
 
         // Helper: wait specified ms but stop immediately if replay is cancelled
@@ -7683,12 +7726,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
             });
         };
 
-        // Helper: get zone id string from snapshot state for a given card
+        // Helper: get zone id string from snapshot state for a given card (including Xyz materials)
         const getZoneIdOfCard = (
             snap: Partial<any>,
-            cardId: string
+            cardId: string,
+            visited = new Set<string>()
         ): string | null => {
-            if (!snap) return null;
+            if (!snap || visited.has(cardId)) return null;
+            visited.add(cardId);
             if (Array.isArray(snap.hand) && snap.hand.includes(cardId)) return 'HAND';
             if (Array.isArray(snap.graveyard) && snap.graveyard.includes(cardId)) return 'GRAVEYARD';
             if (Array.isArray(snap.banished) && snap.banished.includes(cardId)) return 'BANISHED';
@@ -7707,6 +7752,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 const idx = snap.extraMonsterZones.indexOf(cardId);
                 if (idx !== -1) return `EXTRA_MONSTER_ZONE_${idx}`;
             }
+            if (snap.materials && typeof snap.materials === 'object') {
+                for (const [hostId, matIds] of Object.entries(snap.materials)) {
+                    if (Array.isArray(matIds) && matIds.includes(cardId)) {
+                        return getZoneIdOfCard(snap, hostId, visited);
+                    }
+                }
+            }
             return null;
         };
 
@@ -7717,14 +7769,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             return el ? el.getBoundingClientRect() : null;
         };
 
-        // Helper: get DOM rect for a card by its data-card-id
-        const getCardRect = (cardId: string): DOMRect | null => {
-            if (typeof document === 'undefined') return null;
-            const el = document.querySelector(`[data-card-id="${cardId}"]`);
-            return el ? el.getBoundingClientRect() : null;
-        };
-
-        // Helper: collect all unique card IDs across all zone arrays in a snapshot
+        // Helper: collect all unique card IDs across all zone arrays and Xyz materials in a snapshot
         const getAllZoneCardIds = (snap: Partial<any>): Set<string> => {
             const ids = new Set<string>();
             const add = (v: any) => { if (typeof v === 'string') ids.add(v); };
@@ -7737,6 +7782,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             snap.extraMonsterZones?.forEach(add);
             snap.deck?.forEach(add);
             if (snap.fieldZone) ids.add(snap.fieldZone);
+            if (snap.materials && typeof snap.materials === 'object') {
+                Object.values(snap.materials).forEach((matIds: any) => {
+                    if (Array.isArray(matIds)) matIds.forEach(add);
+                });
+            }
             return ids;
         };
 
@@ -7811,8 +7861,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const sCount = snapshot.pendulumSummonCount ?? 0;
 
             // Sync logs immediately at the start of the step to ensure synchronicity with animations and cut-ins
-            const logCount = snapshot.logCount || 0;
-            const currentLogs = chronologicalLogs.slice(0, logCount).reverse();
+            const logCount = getStepLogCount(snapshot);
+            const currentLogs = Array.isArray(snapshot.logs)
+                ? snapshot.logs.filter((l: string) => !isSystemOrErrorLog(l))
+                : chronologicalLogs.slice(0, logCount).reverse();
             set({ logs: currentLogs, currentStepIndex: i });
 
             // --- Detect moved cards FIRST (uses current DOM which hasn't been modified yet) ---
@@ -7820,7 +7872,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (prevSnapshot) {
                 const prevIds = getAllZoneCardIds(prevSnapshot);
-                const currIds = getAllZoneCardIds(snapshot);
                 const allCards = get().cards;
                 const prevSnap = prevSnapshot!; // safe: guarded by if(prevSnapshot)
 
@@ -7829,7 +7880,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const currZone = getZoneIdOfCard(snapshot, cardId);
                     if (prevZone && currZone && prevZone !== currZone && allCards[cardId]) {
                         const fromEl = typeof document !== 'undefined'
-                            ? document.querySelector(`[data-card-id="${cardId}"]`)
+                            ? (Array.from(document.querySelectorAll(`[data-card-id="${cardId}"]`)).find(el => !el.closest('.log-area')) as HTMLElement | undefined) || null
                             : null;
                         const fromRect = fromEl
                             ? fromEl.getBoundingClientRect()
@@ -7869,12 +7920,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 set({ showPendulumCutIn: true });
                 await waitReplay(1333);
                 set({ showPendulumCutIn: false });
+                if (!get().isReplaying) break;
             }
             prevPendulumSummonCount = sCount;
 
             // Detect Opponent Hand Traps / Interruptions Cut-ins from newly added logs (chronological slice)
-            const prevLogCount = prevSnapshot?.logCount || 0;
-            const currentStepLogCount = snapshot.logCount || 0;
+            const prevLogCount = getStepLogCount(prevSnapshot);
+            const currentStepLogCount = logCount;
             const newlyAddedLogs = chronologicalLogs.slice(prevLogCount, currentStepLogCount);
 
             const isZeusNegate = (l: string) => l.includes("天空王ゼウス") || l.includes("Zeus Ragnarok");
@@ -7905,11 +7957,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 set({ showNibiruCutIn: true });
                 await waitReplay(1333);
                 set({ showNibiruCutIn: false });
+                if (!get().isReplaying) break;
                 cutInToTrigger = null; // Consumed so it does not trigger again after moves
             } else if (cutInToTrigger === "harmonia") {
                 set({ showHarmoniaCutIn: true });
                 await waitReplay(1333);
                 set({ showHarmoniaCutIn: false });
+                if (!get().isReplaying) break;
                 cutInToTrigger = null; // Consumed so it does not trigger again after moves
             }
 
@@ -8000,42 +8054,52 @@ export const useGameStore = create<GameStore>((set, get) => ({
             let foundZone: any = null;
 
             const abbrevMap: { [key: string]: string[] } = {
-                'c001': ['ケプラー', 'Kepler'],
-                'c002': ['コペルニクス', 'Copernicus'],
-                'c003': ['ニュートン', 'Newton'],
-                'c005': ['地獄門', 'Gate'],
-                'c006': ['魔神王', 'Swamp'],
-                'c007': ['ジンギス', 'Genghis'],
-                'c008': ['カイゼル・ラグナロク', 'Kaiser Ragnarok'],
-                'c009': ['アビス・ラグナロク', 'Abyss Ragnarok'],
+                'c001': ['灰流うらら', 'うらら', 'Ash Blossom'],
+                'c002': ['無限泡影', '泡影', 'Infinite Impermanence'],
+                'c003': ['ドロール＆ロックバード', 'ドロール', 'Droll & Lock Bird'],
+                'c004': ['ケプラー', 'Kepler'],
+                'c005': ['地獄門の契約書', '地獄門', 'Dark Contract with the Gate', 'Gate'],
+                'c006': ['魔神王の契約書', '魔神王', 'Dark Contract with the Swamp King', 'Swamp King'],
+                'c007': ['烈火王テムジン', 'テムジン', 'Flame King Genghis', 'Genghis'],
+                'c008': ['アビス・ラグナロク', 'アビスラグナロク', 'Abyss Ragnarok'],
+                'c009': ['コペルニクス', 'Copernicus'],
                 'c010': ['トーマス', 'Thomas'],
                 'c011': ['オルトロス', 'Orthros'],
-                'c012': ['ケルベロス', 'Cerberus'],
-                'c015': ['リリス', 'Lilith'],
-                'c016': ['ナイト・ハウリング', 'Night Howling'],
-                'c017': ['ギルガメッシュ', 'ビルガメス', '深淵王', 'Gilgamesh'],
-                'c018': ['デスマキナ', 'Deus Machinex', '怒濤大王'],
-                'c019': ['大王テムジン', 'High King Temujin'],
-                'c020': ['大王アレクサンダー', 'High King Alexander'],
-                'c021': ['大王シーザー', 'High King Caesar'],
-                'c022': ['テル', 'Tell'],
-                'c023': ['シーザー', 'Caesar'],
-                'c024': ['テムジン', 'Temujin'],
-                'c025': ['アレクサンダー', 'Alexander'],
-                'c026': ['クロヴィス', 'Krovis'],
-                'c028': ['ゼウス・ラグナロク', 'ゼウス', 'Zeus Ragnarok', 'Zeus'],
-                'c029': ['アーククライシス', 'Ark Crisis'],
-                'c030': ['ゼロ・マキナ', 'ゼロマキナ', 'Zero Machinex', '零死王'],
-                'c031': ['バフォメット', 'Baphomet'],
-                'c032': ['ネクロ・スライム', 'Necro Slime'],
-                'c033': ['スワラル・スライム', 'Swirl Slime'],
-                'c034': ['戦乙女', 'Witch'],
-                'c035': ['白アーマゲドン', 'Bright Armageddon'],
-                'c038': ['軌跡の魔術師', 'ビヨンド', 'Beyond the Pendulum'],
-                'c042': ['スローン', 'Throne'],
-                'c043': ['オカルティズム', 'Occultism'],
-                'c044': ['カリ・ユガ', 'カリユガ', 'Kali Yuga'],
-                'c046': ['デスキャスター', 'Muckraker'],
+                'c012': ['カウント・サーベイヤー', 'カウントサーベイヤー', 'Count Surveyor'],
+                'c013': ['グリフォン', 'Gryphon'],
+                'c014': ['スケール・サーベイヤー', 'スケールサーベイヤー', 'Scale Surveyor'],
+                'c015': ['ネクロ・スライム', 'ネクロスライム', 'Necro Slime'],
+                'c016': ['戦乙女の契約書', '戦乙女', 'Dark Contract with the Witch', 'Witch'],
+                'c017': ['深淵王ビルガメス', 'ビルガメス', 'ギルガメッシュ', '深淵王', 'Abyss King Gilgamesh', 'Gilgamesh'],
+                'c018': ['赦俿王デス・マキナ', 'デス・マキナ', 'デスマキナ', 'Deus Machinex'],
+                'c019': ['烈火大王エグゼクティブ・テムジン', '大王テムジン', 'エグゼクティブ・テムジン', 'High Flame King Genghis', 'High King Temujin'],
+                'c020': ['呪血王サイフリート', 'サイフリート', 'Cursed King Siegfried', 'Siegfried'],
+                'c021': ['狙撃王テル', 'テル', 'Marksman King Tell', 'Tell'],
+                'c022': ['怒濤王シーザー', 'シーザー', 'Wave King Caesar', 'Caesar'],
+                'c023': ['怒濤大王エグゼクティブ・シーザー', '大王シーザー', 'エグゼクティブ・シーザー', 'Wave Oblivion King Caesar Ragnarok', 'High King Caesar'],
+                'c024': ['常闇の契約書', '常闇', 'Dark Contract with the Eternal Darkness'],
+                'c025': ['智天の新星王ソロモン', 'ソロモン', 'Solomon'],
+                'c026': ['創始王クロヴィス', 'クロヴィス', 'Clovis'],
+                'c027': ['聖槍王アルフレッド', 'アルフレッド', 'Alfred'],
+                'c028': ['天空王ゼウス・ラグナロク', 'ゼウス・ラグナロク', 'ゼウス', 'Zeus Ragnarok'],
+                'c029': ['クライシス・アーク', 'アーク・クライシス', 'アーククライシス', 'Crisis Ark', 'Ark Crisis'],
+                'c030': ['零死王ゼロ・マキナ', 'ゼロ・マキナ', 'ゼロマキナ', '零死王', 'Zero Machinex'],
+                'c031': ['DDDヘッドハント', 'ヘッドハント', 'Headhunt'],
+                'c032': ['ランス・ソルジャー', 'ランスソルジャー', 'Lance Soldier'],
+                'c033': ['ディフェンス・ソルジャー', 'ディフェンスソルジャー', 'Defense Soldier'],
+                'c034': ['零王の契約書', '零王', 'Dark Contract with the Zero King'],
+                'c035': ['死偉王ヘル・アーマゲドン', '白アーマゲドン', 'ヘル・アーマゲドン', 'Bright Armageddon'],
+                'c036': ['ワン・フォー・ワン', 'One for One'],
+                'c037': ['マルチャミー・フワロス', 'フワロス', 'Fuwalos'],
+                'c038': ['軌跡の魔術師', 'ビヨンド・ザ・ペンデュラム', 'ビヨンド', 'Beyond the Pendulum'],
+                'c039': ['ヴァイス・テュポーン', 'ヴァイステュポーン', 'Vice Typhon'],
+                'c040': ['契約書のリビルド', 'リビルド', 'Dark Contract Rebuild'],
+                'c041': ['疾風大王エグゼクティブ・アレクサンダー', '大王アレクサンダー', 'エグゼクティブ・アレクサンダー', 'High Gust King Alexander', 'High King Alexander'],
+                'c042': ['ナイトメア・スローン', 'スローン', 'Nightmare Throne', 'Throne'],
+                'c043': ['異次元の契約書', 'オカルティズム', 'Dark Contract with the Different Dimension'],
+                'c044': ['双暁王カリ・ユガ', 'カリ・ユガ', 'カリユガ', 'Kali Yuga'],
+                'c045': ['調和ノ天救竜', 'ハルモニア', 'Harmonia'],
+                'c046': ['魔界特派員デスキャスター', 'デスキャスター', 'Muckraker From the Underworld', 'Muckraker'],
                 'c047': ['グラヴィティ・コントローラー', 'グラコン', 'Gravity Controller']
             };
 
@@ -8077,8 +8141,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
             }
 
-            if (!matchedCardId && currentLogs.length > 0) {
-                const latestLog = currentLogs[currentLogs.length - 1];
+            if (!matchedCardId && (newlyAddedLogs.length > 0 || currentLogs.length > 0)) {
+                const latestLog = newlyAddedLogs.length > 0
+                    ? newlyAddedLogs[newlyAddedLogs.length - 1]
+                    : currentLogs[0];
                 
                 const getCardIdFromLog = (logText: string, cardsDb: any): string | null => {
                     if (!logText) return null;
@@ -8222,6 +8288,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         foundInstanceId = inGraveId;
                     }
                 }
+
+                if (!foundInstanceId && snapshot.banished && snapshot.cards) {
+                    const inBanishedId = snapshot.banished.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    if (inBanishedId) {
+                        foundInstanceId = inBanishedId;
+                    }
+                }
             }
 
             let currentMidSnapshot = prevSnapshot ? JSON.parse(JSON.stringify(prevSnapshot)) : null;
@@ -8267,6 +8340,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 console.log(`[Replay Step ${i}] No moves detected.`);
             }
 
+            if (!get().isReplaying) break;
+
             // Apply current step snapshot with target card highlighted
             set({
                 ...snapshot,
@@ -8292,6 +8367,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             if (cutInToTrigger) {
                 // Short visual cue so user sees the monster activating its effect on field
                 await waitReplay(Math.min(200, currentPauseDuration));
+                if (!get().isReplaying) break;
 
                 if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
@@ -8304,6 +8380,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
                 if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: false });
+                if (!get().isReplaying) break;
             }
 
             prevSnapshot = snapshot;
@@ -8311,20 +8388,61 @@ export const useGameStore = create<GameStore>((set, get) => ({
             await waitReplay(currentPauseDuration);
         }
 
-        // Restore final state logs fully so another replay or regular play can continue
-        set({
-            isReplaying: false,
-            activeEffectCardId: null,
-            showPendulumCutIn: false,
-            showHarmoniaCutIn: false,
-            logs: originalLogs,
-            replayAnimations: null,
-            activeReplayCardId: null,
-            activeReplayInstanceId: null,
-            activeReplayZone: null,
-            replayOriginalLogs: null,
-            currentStepIndex: fullHistory.length - 1
-        });
+        const completedNormally = get().isReplaying;
+        if (completedNormally) {
+            // Restore final state logs fully so another replay or regular play can continue
+            set({
+                isReplaying: false,
+                activeEffectCardId: null,
+                showPendulumCutIn: false,
+                showAshBlossomCutIn: false,
+                showInfiniteImpermanenceCutIn: false,
+                showImpulseCutIn: false,
+                showDrollCutIn: false,
+                showNibiruCutIn: false,
+                showHarmoniaCutIn: false,
+                logs: originalLogs,
+                history: fullHistory,
+                replayAnimations: null,
+                activeReplayCardId: null,
+                activeReplayInstanceId: null,
+                activeReplayZone: null,
+                replayOriginalLogs: null,
+                currentStepIndex: fullHistory.length - 1
+            });
+        } else {
+            // Stopped mid-replay: keep the current step's board and logs so the user can resume ("ここから再生") or continue playing from here
+            const stoppedStep = Math.max(0, Math.min(get().currentStepIndex, fullHistory.length - 1));
+            const stoppedSnap = fullHistory[stoppedStep] || fullHistory[fullHistory.length - 1];
+            const stoppedLogCount = getStepLogCount(stoppedSnap);
+            const stoppedLogs = Array.isArray(stoppedSnap?.logs)
+                ? stoppedSnap.logs.filter((l: string) => !isSystemOrErrorLog(l))
+                : chronologicalLogs.slice(0, stoppedLogCount).reverse();
+            set({
+                ...(stoppedSnap || {}),
+                backgroundColor: currentBgColor,
+                fieldColor: currentFieldColor,
+                useGradient: currentUseGradient,
+                isReplaying: false,
+                activeEffectCardId: null,
+                showPendulumCutIn: false,
+                showAshBlossomCutIn: false,
+                showInfiniteImpermanenceCutIn: false,
+                showImpulseCutIn: false,
+                showDrollCutIn: false,
+                showNibiruCutIn: false,
+                showHarmoniaCutIn: false,
+                logs: stoppedLogs,
+                history: fullHistory.slice(0, stoppedStep),
+                historySource: fullHistory,
+                replayOriginalLogs: originalLogs,
+                replayAnimations: null,
+                activeReplayCardId: null,
+                activeReplayInstanceId: null,
+                activeReplayZone: null,
+                currentStepIndex: stoppedStep
+            });
+        }
     },
 
     // ... existing actions ...
@@ -8332,13 +8450,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resolveTrigger: (cardId) => {
         const store = get();
         if (store.triggerCandidates.includes(cardId)) {
-            // Highlight for Replay
-            useGameStore.setState({ activeEffectCardId: cardId });
+            // Save pre-trigger state for Undo and set activeEffectCardId for Replay
             get().pushHistory();
-
-            // Clear highlight after snapshot so it doesn't persist to next steps (resolution/summon)
-            useGameStore.setState({ activeEffectCardId: null });
-            get().pushHistory(); // Force clear highlight snapshot for Replay
+            useGameStore.setState({ activeEffectCardId: cardId });
 
             // Only remove the current card from candidates
             useGameStore.setState(prev => ({ triggerCandidates: prev.triggerCandidates.filter(id => id !== cardId) }));
@@ -8354,8 +8468,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 } finally {
                     // Finalize highlight if no async/UI logic was triggered
                     if (!get().effectSelectionState.isOpen && !get().targetingState.isOpen && !get().searchState.isOpen && !get().zoneSelectionState.isOpen) {
-                        set({ activeEffectCardId: null });
                         get().pushHistory();
+                        set({ activeEffectCardId: null });
                     }
                 }
             }

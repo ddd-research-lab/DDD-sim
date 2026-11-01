@@ -9,7 +9,8 @@ import { formatLog } from '@/data/locales';
 
 export function Board() {
     const router = useRouter();
-    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers, ftkModeActive, setFtkModeActive, opponentLp, ftkVictory } = useGameStore();
+    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, activeReplayInstanceId, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers, ftkModeActive, setFtkModeActive, opponentLp, ftkVictory } = useGameStore();
+    const effectiveActiveCardId = activeReplayInstanceId || activeEffectCardId;
     const isTargeting = targetingState.isOpen;
     const isSelectingZone = zoneSelectionState.isOpen;
     const [showExtra, setShowExtra] = useState(false);
@@ -243,7 +244,7 @@ export function Board() {
                 gridColumn: '7 / 8',
                 gridRow: '2 / 3',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: (isReplaying && activeEffectCardId && banished.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(0, 255, 255, 0.8)' : 'none',
+                boxShadow: (isReplaying && effectiveActiveCardId && banished.includes(effectiveActiveCardId)) ? '0 0 15px 5px rgba(0, 255, 255, 0.8)' : 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}
@@ -266,7 +267,7 @@ export function Board() {
                 gridColumn: '7 / 8',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: (isReplaying && activeEffectCardId && graveyard.includes(activeEffectCardId)) ? '0 0 15px 5px rgba(255, 0, 0, 0.8)' : 'none',
+                boxShadow: (isReplaying && effectiveActiveCardId && graveyard.includes(effectiveActiveCardId)) ? '0 0 15px 5px rgba(255, 0, 0, 0.8)' : 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}

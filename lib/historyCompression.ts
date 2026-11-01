@@ -15,7 +15,6 @@ const UI_ONLY_FIELDS: (keyof GameState)[] = [
     'showDrollCutIn',
     'showInfiniteImpermanenceCutIn',
     'showNibiruCutIn',
-    'activeEffectCardId',
     'isLinkSummoningActive',
     'isMaterialMove',
     'isTellBuffActive',

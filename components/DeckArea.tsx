@@ -57,6 +57,7 @@ function SortableCard({ id, card, index, isSelected, onSelect }: SortableCardPro
   return (
     <div
       ref={setNodeRef}
+      data-card-id={id}
       style={style}
       {...attributes}
       {...listeners}
