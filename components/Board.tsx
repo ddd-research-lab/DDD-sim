@@ -10,7 +10,7 @@ import { formatLog } from '@/data/locales';
 export function Board() {
     const router = useRouter();
     const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, activeReplayInstanceId, activeReplayEffectType, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers, ftkModeActive, setFtkModeActive, opponentLp, ftkVictory } = useGameStore();
-    const effectiveActiveCardId = activeReplayInstanceId || activeEffectCardId;
+    const effectiveActiveCardId = isReplaying ? activeReplayInstanceId : activeEffectCardId;
     const isTargeting = targetingState.isOpen;
     const isSelectingZone = zoneSelectionState.isOpen;
     const [showExtra, setShowExtra] = useState(false);
@@ -319,7 +319,11 @@ export function Board() {
                 gridColumn: '1 / 2',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: 'none',
+                boxShadow: (isReplaying && effectiveActiveCardId && extraDeck.includes(effectiveActiveCardId))
+                    ? (activeReplayEffectType === 'negated'
+                        ? '0 0 16px 5px rgba(255, 23, 68, 0.85)'
+                        : '0 0 16px 5px rgba(0, 229, 255, 0.8)')
+                    : 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}
@@ -329,7 +333,9 @@ export function Board() {
                 }}
             >
                 <Zone id="extra-deck-zone" type="EXTRA_DECK" label={formatLog('ui_extra_deck')}>
-                    {getDeckCount(extraDeck, 'EX')}
+                    {(isReplaying && effectiveActiveCardId && extraDeck.includes(effectiveActiveCardId))
+                        ? renderCard(effectiveActiveCardId, false)
+                        : getDeckCount(extraDeck, 'EX')}
                 </Zone>
             </div>
 

@@ -45,10 +45,7 @@ export function Card({ card, isOverlay, onClickOverride, isInteractive = true, d
 
     const isValidTarget = isTargeting && targetFilter && targetFilter(card);
     const isSelected = selectedCards && selectedCards.includes(card.id);
-    const isActiveReplayEffectCard = isReplaying && (
-        activeReplayInstanceId === card.id ||
-        (!activeReplayInstanceId && activeEffectCardId === card.id)
-    );
+    const isActiveReplayEffectCard = isReplaying && activeReplayInstanceId === card.id;
     const isReplayNegated = isActiveReplayEffectCard && activeReplayEffectType === 'negated';
     const isReplayActivation = isActiveReplayEffectCard && activeReplayEffectType !== 'negated';
 

@@ -222,6 +222,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
     // One for One logic
     'c036': (store, selfId, fromLocation) => {
         if (store.spellTrapZones.includes(selfId) && fromLocation === 'HAND') {
+            useGameStore.getState().pushHistory(true);
             store.startEffectSelection(
                 store.language === 'ja' ? '「ワン・フォー・ワン」の効果を発動しますか？' : 'Activate "One for One"?',
                 [{ label: store.language === 'ja' ? 'はい' : 'Yes', value: 'yes' }, { label: store.language === 'ja' ? 'いいえ' : 'No', value: 'no' }],
@@ -605,8 +606,10 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     { label: store.language === 'ja' ? 'いいえ' : 'No', value: 'no' }
                 ],
                 (activationChoice: string, isNegated?: boolean) => {
+                    if (activationChoice !== 'yes') return;
+
                     // Consumes HOPT since activation occurred
-                    useGameStore.getState().addTurnEffectUsage('c042_opt');
+                    useGameStore.getState().addTurnEffectUsage('c042_opt', selfId);
 
                     if (isNegated) {
                         useGameStore.getState().addLog(formatLog('log_c042_negated'));
@@ -662,6 +665,10 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
             const validCostIds = store.hand.filter((id: string) => id !== selfId);
             if (validCostIds.length === 0) return;
 
+            if (fromLocation === 'HAND') {
+                useGameStore.getState().pushHistory(true);
+            }
+
             // 1. Select card from Hand as cost
             store.startSearch(
                 (card: any) => true,
@@ -695,7 +702,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         options,
                         (choice: string, isNegated?: boolean) => {
                             // Consume HOPT
-                            useGameStore.getState().addTurnEffectUsage('c043_opt');
+                            useGameStore.getState().addTurnEffectUsage('c043_opt', selfId);
 
                             // Retrospectively remove the 'Place' and 'Ash' logs to keep history clean
                             useGameStore.setState(s => {
@@ -1045,7 +1052,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                             handDD
                         );
                     }
-                }, false);
+                }, false, selfId);
             }
             return;
         }
@@ -1126,7 +1133,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         });
                     }
                 }
-            }, true);
+            }, true, selfId);
             return;
         }
         // [P-Effect] Target Fiend; ATK+2000, Destroy this.
@@ -1231,7 +1238,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         }
                     );
                 }
-            }, true); // Added canAshBlossom: true
+            }, true, selfId); // Added canAshBlossom: true
         }
     },
 
@@ -1782,7 +1789,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     if (choice === 'yes') {
                         const s = useGameStore.getState();
                         useGameStore.setState({ isMaterialMove: true });
-                        s.moveCard(selfId, 'BANISHED', 0, undefined, true, false, undefined, true);
+                        s.moveCard(selfId, 'BANISHED', 0, undefined, true, false, undefined, true, true);
                         useGameStore.setState({ isMaterialMove: false });
 
                         const selectedIds: string[] = [];
@@ -1826,7 +1833,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                         selectedIds.push(val);
                                         selectNextCard();
                                     }
-                                }
+                                },
+                                false,
+                                selfId
                             );
                         };
 
@@ -1846,9 +1855,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                     returnedNames.push(getCardName(card, sFinal.language));
 
                                     if (isExtra) {
-                                        sFinal.moveCard(id, 'EXTRA_DECK', 0, undefined, true, false, undefined, true);
+                                        sFinal.moveCard(id, 'EXTRA_DECK', 0, undefined, true, false, undefined, true, true);
                                     } else {
-                                        sFinal.moveCard(id, 'DECK', 0, undefined, true, false, undefined, true);
+                                        sFinal.moveCard(id, 'DECK', 0, undefined, true, false, undefined, true, true);
                                         hasMainDeckCard = true;
                                     }
                                 });
@@ -1860,6 +1869,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                                 sFinal.addLog(sFinal.language === 'ja'
                                     ? `${returnedNames.join('＆')}をデッキに戻す（DDリビルド効果）`
                                     : `${returnedNames.join(' & ')} to Deck (DD Rebuild effect)`);
+                                useGameStore.setState({ activeEffectCardId: selfId });
                                 useGameStore.getState().pushHistory(true);
                             } finally {
                                 useGameStore.setState({ isBatching: false });
@@ -1869,7 +1879,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
 
                         selectNextCard();
                     }
-                }
+                },
+                false,
+                selfId
             );
         }
     },
@@ -1888,15 +1900,16 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     store.startSearch(
                         (c: any) => costCandidates.includes(c.id),
                         (costId: string) => {
-                            useGameStore.setState({ lastEffectSourceId: selfId });
-                            store.moveCard(costId, 'GRAVEYARD');
-                            store.addTurnEffectUsage('c016');
+                            useGameStore.setState({ lastEffectSourceId: selfId, activeEffectCardId: selfId });
+                            store.moveCard(costId, 'GRAVEYARD', 0, undefined, false, false, undefined, true, true);
+                            store.addTurnEffectUsage('c016', selfId);
                             const fieldCards = [...store.monsterZones, ...store.extraMonsterZones, ...store.spellTrapZones, store.fieldZone].filter((id): id is string => id !== null);
                             if (fieldCards.length > 0) {
                                 store.startTargeting((c: any) => fieldCards.includes(c.id), (tid: string) => {
-                                    useGameStore.setState({ lastEffectSourceId: selfId });
-                                    store.moveCard(tid, 'GRAVEYARD');
+                                    useGameStore.setState({ lastEffectSourceId: selfId, activeEffectCardId: selfId });
+                                    store.moveCard(tid, 'GRAVEYARD', 0, undefined, false, false, undefined, true, true);
                                     store.addLog(formatLog('log_destroy', { card: getCardName(store.cards[tid], store.language) }));
+                                    useGameStore.getState().pushHistory(true);
                                 });
                             }
                         },
@@ -3190,9 +3203,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                         if (emptyIndices.length > 0) {
                             store.startZoneSelection(formatLog('prompt_select_zone_p'), (t: string, i: number) => t === 'MONSTER_ZONE' && emptyIndices.includes(i), (t: string, i: number) => {
                                 const cardName = getCardName(store.cards[targetId], store.language);
-                                store.moveCard(targetId, 'MONSTER_ZONE', i, undefined, false, true, undefined, true);
+                                store.moveCard(targetId, 'MONSTER_ZONE', i, undefined, false, true, undefined, true, true);
                                 store.addLog(formatLog('log_defense_soldier_ss_pzone', { card: cardName }));
-                                store.addTurnEffectUsage('c033_p_ss');
+                                store.addTurnEffectUsage('c033_p_ss', selfId);
                                 useGameStore.getState().pushHistory(true);
                             });
                         } else {
@@ -3205,13 +3218,10 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     store.addLog(formatLog('log_error_condition'));
                     return;
                 }
-                // Cost: Banish self (moveCard logs banish automatically)
-                store.moveCard(selfId, 'BANISHED');
 
-                // Filter: DD P-Monster in GY or face-up ED (Except Machinex, Ark Crisis)
+                // Filter: DD P-Monster in GY or face-up ED (Except Machinex, Ark Crisis, and self)
                 const isDDP = (c: Card) => isDDArchetype(c) && c.subType?.includes('PENDULUM') && c.cardId !== 'c018' && c.cardId !== 'c029';
 
-                // Re-fetch state to get current locations (though self is already in GY/Banished)
                 const s = useGameStore.getState();
 
                 const extraP = s.extraDeck.filter(id => {
@@ -3220,7 +3230,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     return !isEDType && isDDP(c);
                 });
 
-                const graveP = s.graveyard.filter(id => isDDP(s.cards[id]));
+                const graveP = s.graveyard.filter(id => id !== selfId && isDDP(s.cards[id]));
                 const uniqueTargets = Array.from(new Set([...extraP, ...graveP])); // Deduplicate to be safe
 
                 if (uniqueTargets.length === 0) {
@@ -3231,10 +3241,14 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 store.startSearch(
                     (c: any) => uniqueTargets.includes(c.id),
                     (sid: string) => {
+                        useGameStore.setState({ isMaterialMove: true });
+                        store.moveCard(selfId, 'BANISHED', 0, undefined, true, false, undefined, true, true);
+                        useGameStore.setState({ isMaterialMove: false });
+
                         const cardName = getCardName(store.cards[sid], store.language);
-                        store.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true);
+                        store.moveCard(sid, 'HAND', undefined, undefined, false, false, undefined, true, true);
                         store.addLog(formatLog('log_defense_soldier_recovery', { card: cardName }));
-                        store.addTurnEffectUsage('c033_gy_search');
+                        store.addTurnEffectUsage('c033_gy_search', selfId);
                         useGameStore.getState().pushHistory(true);
                     },
                     formatLog('prompt_select_dd_p'),
@@ -3275,13 +3289,14 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                     if (choice === 'yes' && isNegated) { return; }
                     if (isNegated) return;
                     if (choice === 'yes') {
-                        useGameStore.getState().addTurnEffectUsage('c034');
+                        useGameStore.getState().addTurnEffectUsage('c034', selfId);
 
                         // Handle activating from hand
                         if (inHand) {
                             const emptyST = store.spellTrapZones.map((v: string | null, i: number) => v === null ? i : -1).filter((i: number) => i !== -1);
                             if (emptyST.length > 0) {
                                 store.moveCard(selfId, 'SPELL_TRAP_ZONE', emptyST[0], 'HAND');
+                                useGameStore.getState().pushHistory(true);
                             } else {
                                 store.addLog(formatLog('log_no_available_zones'));
                                 return;
@@ -4145,6 +4160,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 
     moveCard: (cardId, toZone, toIndex = 0, fromLocation = undefined, suppressTrigger = false, isSpecialSummon = false, summonVariant = undefined, skipLog = false, suppressHistoryPush = false) => {
+        if (get().isDragging) {
+            useGameStore.setState({ activeEffectCardId: null });
+        }
         if (!suppressHistoryPush) {
             get().pushHistory();
         }
@@ -5253,7 +5271,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     console.log(`[moveCard DEBUG] suppressTrigger is true for ${cardId}, but we no longer skip its log here.`);
                 }
 
-                const isTargetContractForLogSuppression = ['c005', 'c006', 'c034'].includes(card.cardId || '');
+                const isTargetContractForLogSuppression = ['c005', 'c006', 'c034', 'c036', 'c043'].includes(card.cardId || '');
                 const shouldSuppressLog = isTargetContractForLogSuppression && determinedFromLocation === 'HAND' && actualDestination === 'SPELL_TRAP_ZONE';
 
                 const errorLogStr = formatLog('log_error_condition');
@@ -5336,7 +5354,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                         get().addLog(formatLog(logKey, { card: displayName }));
                                         get().pushHistory(true);
                                     }
-                                }
+                                },
+                                false,
+                                cardId
                             );
                         }
                     };
@@ -5370,7 +5390,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                 ss.deck
                             );
                         }
-                    }
+                    },
+                    true,
+                    cardId
                 );
             }
 
@@ -5489,28 +5511,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                 if (hoptExempt.includes(cid) || usage < 1) {
                     const finalLoc = determinedFromLocation;
-                    useGameStore.setState({ isEffectActivated: false }); // Reset before call
 
                     if (state.isBatching) {
                         useGameStore.setState(prev => ({
                             pendingEffects: [...prev.pendingEffects, () => {
-                                useGameStore.getState().setActiveEffectCard(cardId);
                                 (EFFECT_LOGIC as any)[cid](get(), cardId, finalLoc, summonVariant, isUsedAsMaterialForLogic);
                             }]
                         }));
                     } else {
-                        get().setActiveEffectCard(cardId);
                         (EFFECT_LOGIC as any)[cid](get(), cardId, finalLoc, summonVariant, isUsedAsMaterialForLogic);
                     }
-
-                    // Legacy check: We used to auto-increment usage here.
-                    // But most effects now handle their own usage tracking (addTurnEffectUsage) inside the logic
-                    // especially for interactive effects (startEffectSelection).
-                    // Calling it here causes double-counting and premature highlighting for prompts.
-                    // Removed to rely on internal logic.
-                    // if (!hoptExempt.includes(cid) && get().isEffectActivated) {
-                    //    get().addTurnEffectUsage(cid);
-                    // }
                 }
             } else {
                 // Triggers usually don't log HOPT failure to avoid noise
@@ -5543,15 +5553,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     [usageKey]: current + 1
                 },
                 // Highlight for Replay: Prefer highlightCardId (instance ID), 
-                // fallback to usageKey if it looks like a cardId (e.g. 'c012')
-                activeEffectCardId: highlightCardId || (usageKey.startsWith('c') && !usageKey.includes('_') ? usageKey : null)
+                // fallback to usageKey if it looks like a cardId (e.g. 'c012'),
+                // or keep existing activeEffectCardId set by activateEffect / startEffectSelection
+                activeEffectCardId: highlightCardId || (usageKey.startsWith('c') && !usageKey.includes('_') ? usageKey : state.activeEffectCardId)
             };
         });
-        // Clear highlight unless it's an interactive effect (managed by startTargeting/startSearch etc.)
-        const state = get();
-        if (!state.targetingState.isOpen && !state.searchState.isOpen && !state.effectSelectionState.isOpen && !state.zoneSelectionState.isOpen) {
-            get().setActiveEffectCard(null);
-        }
     },
 
     addLog: (message) => set((state) => {
@@ -6369,7 +6375,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 
     resolveSynchroSummon: (tunerId, nonTunerIds, synchroCardId, toZoneType, toZoneIndex) => {
-        set({ isHistoryBatching: true, isBatching: true });
+        set({ isHistoryBatching: true, isBatching: true, activeEffectCardId: null });
         try {
             set({ isMaterialMove: true });
             get().moveCard(tunerId, 'GRAVEYARD', 0, undefined, true, false, undefined, true, true);
@@ -6392,7 +6398,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     resolveLinkSummon: (linkCardId, materialIds, destinationZoneId, toZoneIndex) => {
-        set({ isHistoryBatching: true, isBatching: true });
+        set({ isHistoryBatching: true, isBatching: true, activeEffectCardId: null });
         const store = get();
         try {
             set({ isLinkSummoningActive: true, isMaterialMove: true });
@@ -6430,7 +6436,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const isXyzMonster = xyzCard.subType?.includes('XYZ') || xyzCardId === 'c018';
         const isArkCrisis = xyzCard.cardId === 'c029';
         const shouldAttach = isXyzMonster && !isArkCrisis;
-        set({ isHistoryBatching: true, isBatching: true });
+        set({ isHistoryBatching: true, isBatching: true, activeEffectCardId: null });
         try {
             // 1. Update Materials and Cleanup Modifiers
             set((state) => {
@@ -6595,6 +6601,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     title,
                     options: currentOptions,
                     onSelect: (val) => {
+                        if (val === 'no' || val === 'cancel') {
+                            useGameStore.setState({ activeEffectCardId: null });
+                        } else if (activatorId) {
+                            useGameStore.setState({ activeEffectCardId: activatorId });
+                        }
                         useGameStore.setState({ effectSelectionState: { isOpen: false, title: '', options: [], onSelect: null } });
                         const performZeusCheck = (resolveEffect: () => void, negateEffect: () => void, targetNameJa: string, targetNameEn: string) => {
                             const s2 = get();
@@ -6728,7 +6739,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                         if (val === 'harmonia') {
                             const resolveHarmonia = () => {
-                                set({ showHarmoniaCutIn: true, harmoniaUsed: true });
+                                set({ showHarmoniaCutIn: true, harmoniaUsed: true, activeEffectCardId: null });
                                 get().addLog(formatLog('log_harmonia_activated'));
                                 get().pushHistory(true);
 
@@ -6748,6 +6759,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                         const s = get();
                                         const targetName = getCardName(s.cards[targetId], s.language);
                                         s.addLog(s.language === 'ja' ? `${targetName}を破壊（ハルモニア効果）` : `Destroyed "${targetName}" (Harmonia effect)`);
+                                        useGameStore.setState({ activeEffectCardId: null });
                                         s.moveCard(targetId, 'GRAVEYARD');
 
                                         // 2. Queue the Harmonia extra effect to be resolved AFTER the main effect (e.g. search) completes
@@ -6774,6 +6786,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                             (bounceId: string) => {
                                                                 const s3 = get();
                                                                 const bounceName = getCardName(s3.cards[bounceId], s3.language);
+                                                                useGameStore.setState({ activeEffectCardId: null });
                                                                 s3.moveCard(bounceId, 'HAND');
                                                                 s3.addLog(s3.language === 'ja' ? `${bounceName}をバウンス（馬龍効果）` : `Bounced ${bounceName} (Baryon effect)`);
                                                                 s3.pushHistory(true);
@@ -6813,6 +6826,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
                                                                         useGameStore.setState({
                                                                             cards: updatedCards,
+                                                                            activeEffectCardId: null,
                                                                             cardFlags: {
                                                                                 ...s4.cardFlags,
                                                                                 [placeMonsterId]: newFlags
@@ -6838,6 +6852,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                         }));
 
                                         // 3. Resolve the original monster effect now
+                                        if (activatorId) {
+                                            useGameStore.setState({ activeEffectCardId: activatorId });
+                                        }
                                         onSelect(options[0].value, false);
                                     },
                                     'red'
@@ -6847,6 +6864,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                             const negateHarmonia = () => {
                                 set({ harmoniaUsed: true }); // Activate, but negated
                                 get().pushHistory(true);
+                                if (activatorId) {
+                                    useGameStore.setState({ activeEffectCardId: activatorId });
+                                }
                                 onSelect(options[0].value, false);
                                 get().processUiQueue();
                             };
@@ -7231,7 +7251,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             const newHistory = [...(state.history || []), snapshot];
             if (newHistory.length > 1000) newHistory.shift(); // Increased limit to 1000 for Replay
-            return { history: newHistory };
+            return force ? { history: newHistory, activeEffectCardId: null } : { history: newHistory };
         });
     },
 
@@ -8089,12 +8109,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const sZones = snapshot.spellTrapZones;
             const sCount = snapshot.pendulumSummonCount ?? 0;
 
-            // Sync logs immediately at the start of the step to ensure synchronicity with animations and cut-ins
             const logCount = getStepLogCount(snapshot);
             const currentLogs = Array.isArray(snapshot.logs)
                 ? snapshot.logs.filter((l: string) => !isSystemOrErrorLog(l))
                 : chronologicalLogs.slice(0, logCount).reverse();
-            set({ logs: currentLogs, currentStepIndex: i });
+            set({ currentStepIndex: i });
 
             // --- Detect moved cards FIRST (uses current DOM which hasn't been modified yet) ---
             let moves: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[] = [];
@@ -8283,7 +8302,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Detect active effect card from log or snapshot
             let matchedCardId: string | null = null;
             let foundInstanceId: string | null = null;
-            let foundZone: any = null;
 
             const abbrevMap: { [key: string]: string[] } = {
                 'c001': ['灰流うらら', 'うらら', 'Ash Blossom'],
@@ -8293,7 +8311,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 'c005': ['地獄門の契約書', '地獄門', 'Dark Contract with the Gate', 'Gate'],
                 'c006': ['魔神王の契約書', '魔神王', 'Dark Contract with the Swamp King', 'Swamp King'],
                 'c007': ['烈火王テムジン', 'テムジン', 'Flame King Genghis', 'Genghis'],
-                'c008': ['アビス・ラグナロク', 'アビスラグナロク', 'Abyss Ragnarok'],
+                'c008': ['アビス・ラグナロク', 'アビスラグナロク', 'アビス', 'Abyss Ragnarok'],
                 'c009': ['コペルニクス', 'Copernicus'],
                 'c010': ['トーマス', 'Thomas'],
                 'c011': ['オルトロス', 'Orthros'],
@@ -8310,7 +8328,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 'c022': ['怒濤王シーザー', 'シーザー', 'Wave King Caesar', 'Caesar'],
                 'c023': ['怒濤大王エグゼクティブ・シーザー', '大王シーザー', 'エグゼクティブ・シーザー', 'Wave Oblivion King Caesar Ragnarok', 'High King Caesar'],
                 'c024': ['常闇の契約書', '常闇', 'Dark Contract with the Eternal Darkness'],
-                'c025': ['智天の新星王ソロモン', 'ソロモン', 'Solomon'],
+                'c025': ['智天の新星王ソロモン', '智慧王ソロモン', 'ソロモン', 'Solomon'],
                 'c026': ['創始王クロヴィス', 'クロヴィス', 'Clovis'],
                 'c027': ['聖槍王アルフレッド', 'アルフレッド', 'Alfred'],
                 'c028': ['天空王ゼウス・ラグナロク', 'ゼウス・ラグナロク', 'ゼウス', 'Zeus Ragnarok'],
@@ -8335,25 +8353,141 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 'c047': ['グラヴィティ・コントローラー', 'グラコン', 'Gravity Controller']
             };
 
-            // Priority 0: Check snapshot.activeEffectCardId if explicitly recorded
-            if (snapshot.activeEffectCardId) {
-                const recordedId = snapshot.activeEffectCardId;
-                const recCard = snapshot.cards?.[recordedId] || get().cards[recordedId];
-                if (recCard) {
-                    matchedCardId = recCard.cardId;
-                    foundInstanceId = recordedId;
-                } else if (recordedId.startsWith('c')) {
-                    matchedCardId = recordedId;
+            const getCardIdFromLog = (logText: string): string | null => {
+                if (!logText) return null;
+
+                // Exclude opponent interruption logs that target player cards
+                if (
+                    logText.includes('ハルモニア効果') || logText.includes('Harmonia effect') ||
+                    logText.includes('パックビット効果') || logText.includes('Packbit effect') ||
+                    logText.includes('馬龍効果') || logText.includes('Baryon effect') ||
+                    logText.includes('調和ノ天救竜を発動') || logText.includes('activated Harmonia') ||
+                    logText.includes('原始生命態ニビル') || logText.includes('Nibiru') ||
+                    logText.includes('ドロール＆ロックバード') || logText.includes('Droll')
+                ) {
+                    return null;
+                }
+
+                // Special Case 1: Gilgamesh (c017) scale placement effect
+                if (logText.includes('をセッティング（1000ダメージ）') || logText.includes('Set Scales:')) {
+                    return 'c017';
+                }
+
+                // Special Case 2: Necro Slime (c015) / Vice Typhon (c039) GY Fusion effect
+                if ((logText.includes('を融合召喚') || logText.includes('Fusion Summoned')) && !logText.includes('効果') && !logText.includes('effect')) {
+                    if (prevSnapshot?.graveyard && snapshot.banished && snapshot.cards) {
+                        const banishedFromGy = snapshot.banished.filter((id: string) => prevSnapshot!.graveyard!.includes(id));
+                        const necro = banishedFromGy.find((id: string) => (snapshot.cards?.[id]?.cardId || get().cards[id]?.cardId) === 'c015');
+                        if (necro) return 'c015';
+                        const typhon = banishedFromGy.find((id: string) => (snapshot.cards?.[id]?.cardId || get().cards[id]?.cardId) === 'c039');
+                        if (typhon) return 'c039';
+                    }
+                    return null;
+                }
+
+                // Special Case 3: Count Surveyor (c012) hand SS effect with discard cost
+                if (
+                    (logText.includes('カウント・サーベイヤー') || logText.includes('Count Surveyor')) &&
+                    (logText.includes('特殊召喚') || logText.includes('Special Summoned')) &&
+                    (logText.includes('コスト：') || logText.includes('Cost:'))
+                ) {
+                    return 'c012';
+                }
+
+                const hasNegationOrFailure =
+                    logText.includes('できません') ||
+                    logText.includes('満たしていません') ||
+                    logText.includes('しませんでした') ||
+                    logText.includes('ないため');
+                if (hasNegationOrFailure) return null;
+
+                // Priority 1: Check if there is an activator card mentioned within parentheses with "effect" or "効果"
+                // Handles both "（ケプラー効果）" and "（零王効果：ケプラーを破壊）" / "（DDD狙撃王テル効果：コスト・...）"
+                const parenRegex = /[（\(]([^）\)]*?(?:効果|effect)[^）\)]*?)[）\)]/i;
+                const parenMatch = logText.match(parenRegex);
+                if (parenMatch) {
+                    const insideParen = parenMatch[1];
+                    const effectPart = insideParen.split(/[：:]/).find(part => part.includes('効果') || /effect/i.test(part)) || insideParen;
+                    let matchedId: string | null = null;
+                    let maxLen = 0;
+                    Object.keys(abbrevMap).forEach(cardId => {
+                        abbrevMap[cardId].forEach(name => {
+                            if (effectPart.includes(name) && name.length > maxLen) {
+                                maxLen = name.length;
+                                matchedId = cardId;
+                            }
+                        });
+                    });
+                    if (matchedId) return matchedId;
+                }
+
+                // Remove parentheses content completely before normal matching to avoid matching search targets/costs
+                const cleanText = logText.replace(/[（\(][^）\)]*?[）\)]/g, '');
+
+                // Priority 2: Look for "[CardName]の効果" or "[CardName]効果" or "Activated [CardName]" in the cleaned text
+                let bestCardId: string | null = null;
+                let longestMatchLength = 0;
+
+                Object.keys(abbrevMap).forEach(cardId => {
+                    abbrevMap[cardId].forEach(name => {
+                        const effectKeywords = [
+                            `${name}効果`,
+                            `${name}の効果`,
+                            `「${name}」の効果`,
+                            `${name}のP効果`,
+                            `${name}のモンスター効果`,
+                            `${name}を発動`,
+                            `「${name}」を発動`,
+                            `${name} effect`,
+                            `effect of ${name}`,
+                            `effect of "${name}"`,
+                            `Activated ${name}`,
+                            `Activated "${name}"`
+                        ];
+                        const isSpecificEffect = effectKeywords.some(kw => cleanText.includes(kw));
+                        if (isSpecificEffect && name.length > longestMatchLength) {
+                            longestMatchLength = name.length;
+                            bestCardId = cardId;
+                        }
+                    });
+                });
+
+                if (bestCardId) return bestCardId;
+
+                // Priority 2.5: Explicit P-zone placement by effect ("アーククライシスをPゾーンに置く" / "白アーマゲドンをPゾーンに置く" / "ゼロ・マキナをPゾーンに置く")
+                if (cleanText.includes('をPゾーンに置く') || cleanText.includes('in P-Zone')) {
+                    Object.keys(abbrevMap).forEach(cardId => {
+                        abbrevMap[cardId].forEach(name => {
+                            if (cleanText.includes(name) && name.length > longestMatchLength) {
+                                longestMatchLength = name.length;
+                                bestCardId = cardId;
+                            }
+                        });
+                    });
+                    if (bestCardId) return bestCardId;
+                }
+
+                return null;
+            };
+
+            // Determine activator card strictly from newlyAddedLogs of this step first
+            if (newlyAddedLogs.length > 0) {
+                for (let lIdx = newlyAddedLogs.length - 1; lIdx >= 0; lIdx--) {
+                    const cId = getCardIdFromLog(newlyAddedLogs[lIdx]);
+                    if (cId) {
+                        matchedCardId = cId;
+                        break;
+                    }
                 }
             }
 
-            // Priority 0.5: Target detection for Infinite Impermanence negation log
+            // Target detection for Infinite Impermanence / Impulse negation log
             if (!matchedCardId && newlyAddedLogs.length > 0) {
-                const impLog = newlyAddedLogs.find(l => l.includes('泡影') || l.includes('Impermanence'));
-                if (impLog) {
-                    const impMatch = impLog.match(/^(.*?)(?:の効果が無効|'s effect was negated)/);
-                    if (impMatch) {
-                        const targetName = impMatch[1].trim();
+                const negLog = newlyAddedLogs.find(l => l.includes('泡影') || l.includes('Impermanence') || l.includes('霊王の波動') || l.includes('Dominus Impulse'));
+                if (negLog) {
+                    const negMatch = negLog.match(/^(.*?)(?:の効果が無効|'s effect was negated)/);
+                    if (negMatch) {
+                        const targetName = negMatch[1].trim();
                         for (const cId of Object.keys(abbrevMap)) {
                             if (abbrevMap[cId].some(n => targetName.includes(n))) {
                                 matchedCardId = cId;
@@ -8362,7 +8496,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         }
                         if (!matchedCardId) {
                             const allCards = snapshot.cards || get().cards;
-                            for (const [id, c] of Object.entries(allCards as { [key: string]: Card })) {
+                            for (const [, c] of Object.entries(allCards as { [key: string]: Card })) {
                                 if ((c.nameJa && targetName.includes(c.nameJa)) || (c.name && targetName.includes(c.name))) {
                                     matchedCardId = c.cardId;
                                     break;
@@ -8373,183 +8507,162 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
             }
 
-            if (!matchedCardId && (newlyAddedLogs.length > 0 || currentLogs.length > 0)) {
-                const latestLog = newlyAddedLogs.length > 0
-                    ? newlyAddedLogs[newlyAddedLogs.length - 1]
-                    : currentLogs[0];
-                
-                const getCardIdFromLog = (logText: string, cardsDb: any): string | null => {
-                    if (!logText) return null;
-                    
-                    const hasActivate = logText.includes('発動') || logText.includes('Activated') || logText.includes('effect') || logText.includes('効果') || logText.includes('置く') || logText.includes('セット');
-                    const hasNegationOrFailure = logText.includes('できません') || logText.includes('満たしていません') || logText.includes('しませんでした') || logText.includes('ないため');
-                    const isSummonLog = logText.includes('融合召喚') || logText.includes('S召喚') || logText.includes('X召喚') || logText.includes('リンク召喚') || logText.includes('特殊召喚');
-                    const isArkCrisis = (logText.includes('アーククライシス') || logText.includes('c029')) && !logText.includes('効果');
-                    
-                    if (!hasActivate || hasNegationOrFailure || (isSummonLog && !logText.includes('効果')) || isArkCrisis) {
-                        return null;
-                    }
+            // Check snapshot.activeEffectCardId ONLY if this step actually has an effect activation log (or negation cut-in),
+            // AND verify it matches matchedCardId if getCardIdFromLog already identified the card.
+            const isPureSummonOrPlaceWithoutEffect = newlyAddedLogs.length > 0 && newlyAddedLogs.every(l => {
+                const isSimpleMove =
+                    l.includes('通常召喚') || l.includes('Normal Summoned') ||
+                    l.includes('Pスケールにセッティング') || l.includes('Set Scale') ||
+                    l.includes('魔法＆罠ゾーンにセット') ||
+                    l.includes('フィールドゾーンに発動') ||
+                    ((l.includes('魔法＆罠ゾーンに発動') || l.includes('Activated ')) && !l.includes('効果') && !l.includes('effect')) ||
+                    ((l.includes('S召喚') || l.includes('X召喚') || l.includes('リンク召喚') || l.includes('P召喚') || l.includes('特殊召喚')) && !l.includes('効果') && !l.includes('effect') && !l.includes('コスト：') && !l.includes('Cost:'));
+                return isSimpleMove;
+            });
 
-                    // Priority 1: Check if there is an activator card mentioned within parentheses with "effect" or "効果"
-                    const parenRegex = /[（\(]([^）\)]*?効果|[^）\)]*?effect)[）\)]/i;
-                    const parenMatch = logText.match(parenRegex);
-                    if (parenMatch) {
-                        const insideParen = parenMatch[1];
-                        const effectSourcePart = insideParen.split(/[：:]/).pop() || insideParen;
-                        let matchedId: string | null = null;
-                        let maxLen = 0;
-                        Object.keys(abbrevMap).forEach(cardId => {
-                            abbrevMap[cardId].forEach(name => {
-                                if (effectSourcePart.includes(name) && name.length > maxLen) {
-                                    maxLen = name.length;
-                                    matchedId = cardId;
-                                }
-                            });
-                        });
-                        if (matchedId) return matchedId;
-                    }
+            if (isPureSummonOrPlaceWithoutEffect) {
+                matchedCardId = null;
+                foundInstanceId = null;
+            } else if (snapshot.activeEffectCardId) {
+                const recordedId = snapshot.activeEffectCardId;
+                const recCard = snapshot.cards?.[recordedId] || get().cards[recordedId];
+                const recCardId = recCard ? recCard.cardId : (recordedId.startsWith('c') ? recordedId : null);
 
-                    // Remove parentheses content completely before normal matching to avoid matching search targets/costs
-                    let cleanText = logText.replace(/[（\(][^）\)]*?[）\)]/g, '');
-
-                    // Priority 2: Look for "[CardName]の効果を発動" or "[CardName]効果" specifically in the cleaned text
-                    let bestCardId: string | null = null;
-                    let longestMatchLength = 0;
-
-                    Object.keys(abbrevMap).forEach(cardId => {
-                        abbrevMap[cardId].forEach(name => {
-                            const effectKeywords = [`${name}効果`, `${name}の効果`, `${name} effect`, `effect of ${name}`, `effect of "${name}"`];
-                            const isSpecificEffect = effectKeywords.some(kw => cleanText.includes(kw));
-                            if (isSpecificEffect && name.length > longestMatchLength) {
-                                longestMatchLength = name.length;
-                                bestCardId = cardId;
-                            }
-                        });
-                    });
-
-                    if (bestCardId) return bestCardId;
-
-                    // Priority 3: Fallback to longest match on cleaned text
-                    Object.keys(abbrevMap).forEach(cardId => {
-                        abbrevMap[cardId].forEach(name => {
-                            if (cleanText.includes(name) && name.length > longestMatchLength) {
-                                longestMatchLength = name.length;
-                                bestCardId = cardId;
-                            }
-                        });
-                    });
-
-                    return bestCardId;
-                };
-
-                matchedCardId = getCardIdFromLog(latestLog, snapshot.cards || get().cards);
+                if (!matchedCardId && (newlyAddedLogs.some(l => l.includes('効果') || l.includes('effect') || l.includes('無効') || l.includes('negated')) || cutInToTrigger === 'ash' || cutInToTrigger === 'impermanence' || cutInToTrigger === 'impulse')) {
+                    matchedCardId = recCardId;
+                    if (recCard) foundInstanceId = recordedId;
+                } else if (matchedCardId && recCard && recCard.cardId === matchedCardId) {
+                    foundInstanceId = recordedId;
+                }
             }
 
-            if (matchedCardId && !foundInstanceId) {
-                // Check if an instance of matchedCardId was banished from GY in this step (e.g. Necro Slime, Vice Typhon, Defense Soldier, DD Rebuild)
-                if (prevSnapshot?.graveyard && snapshot.banished && snapshot.cards) {
+            // Look up the activating card instance & zone in prevSnapshot FIRST (pre-effect state!)
+            // so the effect glow appears on the card right BEFORE its effect moves/processes!
+            let preEffectInstanceId: string | null = foundInstanceId;
+            let preEffectZone: any = null;
+            const searchSnap = prevSnapshot || snapshot;
+            const cardsDb = searchSnap.cards || snapshot.cards || get().cards;
+
+            const matchesCardId = (id: string | null | undefined) => {
+                if (!id || !matchedCardId) return false;
+                const c = cardsDb?.[id] || snapshot.cards?.[id] || get().cards[id];
+                return c?.cardId === matchedCardId;
+            };
+
+            if (matchedCardId) {
+                // If we already have a specific instanceId, verify it exists in searchSnap
+                if (preEffectInstanceId && !matchesCardId(preEffectInstanceId)) {
+                    preEffectInstanceId = null;
+                }
+
+                // 1. Check if an instance of matchedCardId was moved as a cost/self-movement from prevSnapshot in this step:
+                //    - Banished from GY (e.g. Necro Slime, Vice Typhon, Defense Soldier, DD Rebuild)
+                //    - Moved from Hand to Monster/ST/GY (e.g. Gryphon, Scale Surveyor, Count Surveyor, Orthros, Zero Machinex, Clovis, Lance Soldier, Thomas, Kepler P-effect)
+                //    - Moved from P-Zone / ST-Zone to Monster/GY/Hand (e.g. Zero Machinex, Defense Soldier, Orthros, Thomas, Apocalypse, Solomon, Caesar)
+                //    - Moved from Extra Deck to Monster/P-Zone (e.g. Zero Machinex reaction, Ark Crisis, Bright Armageddon)
+                //    - Moved from GY/Banished to Monster/ST/Hand (e.g. Vice Typhon, Clovis, Lance Soldier, Defense Soldier, Orthros, Thomas)
+                if (!preEffectInstanceId && prevSnapshot) {
+                    const movedActivator = moves.find(m => matchesCardId(m.cardId));
+                    if (movedActivator) {
+                        preEffectInstanceId = movedActivator.cardId;
+                    }
+                }
+
+                // 2. Check if banished from GY in this step (even if not in moves array)
+                if (!preEffectInstanceId && prevSnapshot?.graveyard && snapshot.banished) {
                     const prevGy = prevSnapshot.graveyard;
                     const banishedFromGyId = [...snapshot.banished].reverse().find((id: string) =>
-                        prevGy.includes(id) &&
-                        (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)
+                        prevGy.includes(id) && matchesCardId(id)
                     );
                     if (banishedFromGyId) {
-                        foundInstanceId = banishedFromGyId;
+                        preEffectInstanceId = banishedFromGyId;
                     }
                 }
 
-                // If this is Impermanence cut-in, prioritize Monster Zones & EMZ
-                if (!foundInstanceId && (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => (l.includes('泡影') || l.includes('Impermanence')) && !isZeusNegate(l)))) {
-                    if (snapshot.extraMonsterZones && snapshot.cards) {
-                        for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
-                            const id = snapshot.extraMonsterZones[idx];
-                            if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                                foundInstanceId = id;
-                                foundZone = { type: 'EXTRA_MONSTER_ZONE', index: idx };
-                                break;
-                            }
-                        }
-                    }
-                    if (!foundInstanceId && snapshot.monsterZones && snapshot.cards) {
-                        for (let idx = 0; idx < snapshot.monsterZones.length; idx++) {
-                            const id = snapshot.monsterZones[idx];
-                            if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                                foundInstanceId = id;
-                                foundZone = { type: 'MONSTER_ZONE', index: idx };
-                                break;
-                            }
+                // 3. If Impermanence / Harmonia / Monster effect on field, check EMZ & Monster Zones in searchSnap
+                if (!preEffectInstanceId && searchSnap.extraMonsterZones) {
+                    for (let idx = 0; idx < searchSnap.extraMonsterZones.length; idx++) {
+                        const id = searchSnap.extraMonsterZones[idx];
+                        if (matchesCardId(id)) {
+                            preEffectInstanceId = id;
+                            break;
                         }
                     }
                 }
-
-                if (!foundInstanceId && snapshot.spellTrapZones && snapshot.cards) {
-                    for (let idx = 0; idx < snapshot.spellTrapZones.length; idx++) {
-                        const id = snapshot.spellTrapZones[idx];
-                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                            foundInstanceId = id;
-                            foundZone = { type: 'SPELL_TRAP_ZONE', index: idx };
+                if (!preEffectInstanceId && searchSnap.monsterZones) {
+                    for (let idx = 0; idx < searchSnap.monsterZones.length; idx++) {
+                        const id = searchSnap.monsterZones[idx];
+                        if (matchesCardId(id)) {
+                            preEffectInstanceId = id;
                             break;
                         }
                     }
                 }
 
-                if (!foundInstanceId && snapshot.monsterZones && snapshot.cards) {
-                    for (let idx = 0; idx < snapshot.monsterZones.length; idx++) {
-                        const id = snapshot.monsterZones[idx];
-                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                            foundInstanceId = id;
-                            foundZone = { type: 'MONSTER_ZONE', index: idx };
+                // 4. Check Spell/Trap Zones & Field Zone in searchSnap
+                if (!preEffectInstanceId && searchSnap.spellTrapZones) {
+                    for (let idx = 0; idx < searchSnap.spellTrapZones.length; idx++) {
+                        const id = searchSnap.spellTrapZones[idx];
+                        if (matchesCardId(id)) {
+                            preEffectInstanceId = id;
                             break;
                         }
                     }
                 }
-
-                if (!foundInstanceId && snapshot.extraMonsterZones && snapshot.cards) {
-                    for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
-                        const id = snapshot.extraMonsterZones[idx];
-                        if (id && (snapshot.cards[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)) {
-                            foundInstanceId = id;
-                            foundZone = { type: 'EXTRA_MONSTER_ZONE', index: idx };
-                            break;
-                        }
-                    }
+                if (!preEffectInstanceId && searchSnap.fieldZone && matchesCardId(searchSnap.fieldZone)) {
+                    preEffectInstanceId = searchSnap.fieldZone;
                 }
 
-                if (!foundInstanceId && snapshot.hand && snapshot.cards) {
-                    const inHandId = snapshot.hand.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
-                    if (inHandId) {
-                        foundInstanceId = inHandId;
-                    }
+                // 5. Check Hand in searchSnap
+                if (!preEffectInstanceId && searchSnap.hand) {
+                    const inHandId = searchSnap.hand.find((id: string) => matchesCardId(id));
+                    if (inHandId) preEffectInstanceId = inHandId;
                 }
 
-                if (!foundInstanceId && snapshot.fieldZone && snapshot.cards && (snapshot.cards[snapshot.fieldZone]?.cardId === matchedCardId || get().cards[snapshot.fieldZone]?.cardId === matchedCardId)) {
-                    foundInstanceId = snapshot.fieldZone;
-                    foundZone = { type: 'FIELD_ZONE', index: 0 };
+                // 6. Check Graveyard in searchSnap
+                if (!preEffectInstanceId && searchSnap.graveyard) {
+                    const inGraveId = [...searchSnap.graveyard].reverse().find((id: string) => matchesCardId(id));
+                    if (inGraveId) preEffectInstanceId = inGraveId;
                 }
 
-                if (!foundInstanceId && snapshot.graveyard && snapshot.cards) {
-                    const inGraveId = [...snapshot.graveyard].reverse().find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
-                    if (inGraveId) {
-                        foundInstanceId = inGraveId;
-                    }
+                // 7. Check Banished in searchSnap
+                if (!preEffectInstanceId && searchSnap.banished) {
+                    const inBanishedId = [...searchSnap.banished].reverse().find((id: string) => matchesCardId(id));
+                    if (inBanishedId) preEffectInstanceId = inBanishedId;
                 }
 
-                if (!foundInstanceId && snapshot.banished && snapshot.cards) {
-                    const inBanishedId = [...snapshot.banished].reverse().find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
-                    if (inBanishedId) {
-                        foundInstanceId = inBanishedId;
-                    }
+                // 8. Check Extra Deck in searchSnap (e.g. Zero Machinex reaction c030, Ark Crisis c029, Bright Armageddon c035)
+                if (!preEffectInstanceId && searchSnap.extraDeck) {
+                    const inEdId = [...searchSnap.extraDeck].reverse().find((id: string) => matchesCardId(id));
+                    if (inEdId) preEffectInstanceId = inEdId;
                 }
-            }
 
-            if (foundInstanceId && !foundZone) {
-                const mzIdx = snapshot.monsterZones?.indexOf(foundInstanceId) ?? -1;
-                const emzIdx = snapshot.extraMonsterZones?.indexOf(foundInstanceId) ?? -1;
-                const stzIdx = snapshot.spellTrapZones?.indexOf(foundInstanceId) ?? -1;
-                if (mzIdx !== -1) foundZone = { type: 'MONSTER_ZONE', index: mzIdx };
-                else if (emzIdx !== -1) foundZone = { type: 'EXTRA_MONSTER_ZONE', index: emzIdx };
-                else if (stzIdx !== -1) foundZone = { type: 'SPELL_TRAP_ZONE', index: stzIdx };
-                else if (snapshot.fieldZone === foundInstanceId) foundZone = { type: 'FIELD_ZONE', index: 0 };
+                // 9. Fallback to snapshot if not found in prevSnapshot
+                if (!preEffectInstanceId) {
+                    const allSnapIds = [
+                        ...(snapshot.monsterZones || []),
+                        ...(snapshot.extraMonsterZones || []),
+                        ...(snapshot.spellTrapZones || []),
+                        snapshot.fieldZone,
+                        ...(snapshot.hand || []),
+                        ...(snapshot.graveyard || []),
+                        ...(snapshot.banished || []),
+                        ...(snapshot.extraDeck || [])
+                    ].filter(Boolean) as string[];
+                    const fallbackId = allSnapIds.find(id => matchesCardId(id));
+                    if (fallbackId) preEffectInstanceId = fallbackId;
+                }
+
+                // Determine preEffectZone in searchSnap
+                if (preEffectInstanceId) {
+                    const mzIdx = searchSnap.monsterZones?.indexOf(preEffectInstanceId) ?? -1;
+                    const emzIdx = searchSnap.extraMonsterZones?.indexOf(preEffectInstanceId) ?? -1;
+                    const stzIdx = searchSnap.spellTrapZones?.indexOf(preEffectInstanceId) ?? -1;
+                    if (mzIdx !== -1) preEffectZone = { type: 'MONSTER_ZONE', index: mzIdx };
+                    else if (emzIdx !== -1) preEffectZone = { type: 'EXTRA_MONSTER_ZONE', index: emzIdx };
+                    else if (stzIdx !== -1) preEffectZone = { type: 'SPELL_TRAP_ZONE', index: stzIdx };
+                    else if (searchSnap.fieldZone === preEffectInstanceId) preEffectZone = { type: 'FIELD_ZONE', index: 0 };
+                }
             }
 
             const isNegatedCutIn = cutInToTrigger === 'ash' || cutInToTrigger === 'impermanence' || cutInToTrigger === 'impulse';
@@ -8578,7 +8691,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
             const hasXyzDetach = detachedMaterialIds.size > 0;
 
-            let currentMidSnapshot = prevSnapshot ? JSON.parse(JSON.stringify(prevSnapshot)) : null;
+            let currentMidSnapshot = prevSnapshot ? JSON.parse(JSON.stringify(prevSnapshot)) : JSON.parse(JSON.stringify(snapshot));
 
             // Ensure P-scale cards that were already on the field are kept in P-zones
             // so they do not temporarily disappear, revert to hand, or animate.
@@ -8592,39 +8705,118 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 currentMidSnapshot = getMidSnapshot(currentMidSnapshot, snapshot, scaleIds);
             }
 
-            if (moveGroups.length > 0 && currentAnimDuration > 30) {
-                console.log(`[Replay Step ${i}] Detected ${moveGroups.length} move groups.`);
-                for (let g = 0; g < moveGroups.length; g++) {
+            const prevStepLogs = prevSnapshot
+                ? (Array.isArray(prevSnapshot.logs)
+                    ? prevSnapshot.logs.filter((l: string) => !isSystemOrErrorLog(l))
+                    : chronologicalLogs.slice(0, prevLogCount).reverse())
+                : currentLogs;
+
+            // Split moveGroups into:
+            // 1. Xyz material detach cost groups (animate BEFORE the effect activation glow)
+            // 2. Effect resolution / normal move groups (animate AFTER the effect activation glow)
+            const detachCostGroups = hasXyzDetach
+                ? moveGroups.filter(group => group.some(m => detachedMaterialIds.has(m.cardId)))
+                : [];
+            const effectMoveGroups = hasXyzDetach
+                ? moveGroups.filter(group => !group.some(m => detachedMaterialIds.has(m.cardId)))
+                : moveGroups;
+
+            // --- PHASE 1: Xyz Material Detach Cost Animation (if any) ---
+            if (detachCostGroups.length > 0 && currentAnimDuration > 30) {
+                for (let g = 0; g < detachCostGroups.length; g++) {
                     if (!get().isReplaying) break;
-                    const group = moveGroups[g];
-                    const isDetachCostGroup = hasXyzDetach && group.some(m => detachedMaterialIds.has(m.cardId));
+                    const group = detachCostGroups[g];
+                    set({ replayAnimations: group, replayAnimDuration: currentAnimDuration });
+
+                    const movedIds = new Set(group.map(m => m.cardId));
+                    currentMidSnapshot = getMidSnapshot(currentMidSnapshot || snapshot, snapshot, movedIds);
+
+                    set({
+                        ...currentMidSnapshot,
+                        activeEffectCardId: null,
+                        logs: prevStepLogs,
+                        backgroundColor: currentBgColor,
+                        fieldColor: currentFieldColor,
+                        useGradient: currentUseGradient,
+                        history: fullHistory,
+                        isReplaying: true,
+                        activeReplayCardId: null,
+                        activeReplayInstanceId: null,
+                        activeReplayZone: null,
+                        activeReplayEffectType: null,
+                    });
+
+                    await waitReplay(currentAnimDuration);
+                }
+                set({ replayAnimations: null });
+            }
+
+            if (!get().isReplaying) break;
+
+            // --- PHASE 2: Pre-Effect Activation Glow (Right BEFORE the card's effect is processed) ---
+            if (matchedCardId && preEffectInstanceId) {
+                const preEffectDuration = Math.max(300, Math.floor(550 / currentSpeed));
+                set({
+                    ...currentMidSnapshot,
+                    activeEffectCardId: null,
+                    logs: prevStepLogs,
+                    backgroundColor: currentBgColor,
+                    fieldColor: currentFieldColor,
+                    useGradient: currentUseGradient,
+                    history: fullHistory,
+                    isReplaying: true,
+                    replayAnimations: null,
+                    activeReplayCardId: matchedCardId,
+                    activeReplayInstanceId: preEffectInstanceId,
+                    activeReplayZone: preEffectZone,
+                    activeReplayEffectType: initialEffectType,
+                });
+
+                await waitReplay(preEffectDuration);
+                if (!get().isReplaying) break;
+
+                // If negated by Ash Blossom / Infinite Impermanence / Impulse, show the cut-in and red negated glow right here
+                if (isNegatedCutIn && cutInToTrigger) {
+                    if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true, activeReplayEffectType: 'negated', logs: currentLogs });
+                    if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true, activeReplayEffectType: 'negated', logs: currentLogs });
+                    if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true, activeReplayEffectType: 'negated', logs: currentLogs });
+
+                    await waitReplay(1333);
+
+                    if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: false });
+                    if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: false });
+                    if (cutInToTrigger === "impulse") set({ showImpulseCutIn: false });
+                    cutInToTrigger = null;
+                    if (!get().isReplaying) break;
+                }
+            }
+
+            // --- PHASE 3: Effect Resolution / Card Movement Animation ---
+            if (effectMoveGroups.length > 0 && currentAnimDuration > 30) {
+                console.log(`[Replay Step ${i}] Animating ${effectMoveGroups.length} move groups.`);
+                for (let g = 0; g < effectMoveGroups.length; g++) {
+                    if (!get().isReplaying) break;
+                    const group = effectMoveGroups[g];
 
                     set({ replayAnimations: group, replayAnimDuration: currentAnimDuration });
 
                     const movedIds = new Set(group.map(m => m.cardId));
                     currentMidSnapshot = getMidSnapshot(currentMidSnapshot || snapshot, snapshot, movedIds);
 
-                    // While Xyz material is being detached to GY, keep the effect highlight and effect resolution log OFF so the material moves to GY first,
-                    // and then show the effect highlight & resolution (e.g. search to hand / burn damage) afterwards.
-                    const prevStepLogs = prevSnapshot
-                        ? (Array.isArray(prevSnapshot.logs)
-                            ? prevSnapshot.logs.filter((l: string) => !isSystemOrErrorLog(l))
-                            : chronologicalLogs.slice(0, prevLogCount).reverse())
-                        : currentLogs;
-
                     set({
-                         ...currentMidSnapshot,
-                         logs: isDetachCostGroup ? prevStepLogs : currentLogs,
-                         backgroundColor: currentBgColor,
-                         fieldColor: currentFieldColor,
-                         useGradient: currentUseGradient,
-                         history: fullHistory,
-                         isReplaying: true,
-                         activeReplayCardId: isDetachCostGroup ? null : matchedCardId,
-                         activeReplayInstanceId: isDetachCostGroup ? null : foundInstanceId,
-                         activeReplayZone: isDetachCostGroup ? null : foundZone,
-                         activeReplayEffectType: isDetachCostGroup ? null : initialEffectType,
-                     });
+                        ...currentMidSnapshot,
+                        activeEffectCardId: null,
+                        logs: currentLogs,
+                        backgroundColor: currentBgColor,
+                        fieldColor: currentFieldColor,
+                        useGradient: currentUseGradient,
+                        history: fullHistory,
+                        isReplaying: true,
+                        activeReplayCardId: null,
+                        activeReplayInstanceId: null,
+                        activeReplayZone: null,
+                        activeReplayEffectType: null,
+                    });
 
                     await waitReplay(currentAnimDuration);
                 }
@@ -8634,9 +8826,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (!get().isReplaying) break;
 
-            // Apply current step snapshot with target card highlighted (after Xyz material has landed in GY and effect has resolved)
+            // Apply final state of this step (clear pre-effect highlight so moved/target cards don't glow after resolution)
             set({
                 ...snapshot,
+                activeEffectCardId: null,
                 logs: currentLogs,
                 backgroundColor: currentBgColor,
                 fieldColor: currentFieldColor,
@@ -8651,21 +8844,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 isBatching: false,
                 isReplaying: true,
                 replayAnimations: null, // Clear animations exactly as the new state applies
-                activeReplayCardId: matchedCardId,
-                activeReplayInstanceId: foundInstanceId,
-                activeReplayZone: foundZone,
-                activeReplayEffectType: initialEffectType,
+                activeReplayCardId: null,
+                activeReplayInstanceId: null,
+                activeReplayZone: null,
+                activeReplayEffectType: null,
             });
 
-            // Trigger hand trap cut-ins (Impermanence, Ash, etc.) AFTER the monster is placed and highlighted
+            // Trigger any remaining cut-in (e.g. Droll & Lock Bird after search resolves, or negation cut-in when no card was matched)
             if (cutInToTrigger) {
-                // Short visual cue so user sees the monster activating its effect on field
                 await waitReplay(Math.min(200, currentPauseDuration));
                 if (!get().isReplaying) break;
 
-                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
-                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
-                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
+                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
+                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
+                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
 
                 await waitReplay(1333);
