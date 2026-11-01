@@ -9,7 +9,7 @@ import { formatLog } from '@/data/locales';
 
 export function Board() {
     const router = useRouter();
-    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, activeReplayInstanceId, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers, ftkModeActive, setFtkModeActive, opponentLp, ftkVictory } = useGameStore();
+    const { undo, resetGame, monsterZones, spellTrapZones, fieldZone, extraMonsterZones, graveyard, banished, extraDeck, cards, startSearch, targetingState, zoneSelectionState, startPendulumSummon, pendulumSummonCount, pendulumSummonLimit, activeEffectCardId, activeReplayInstanceId, activeReplayEffectType, spellTrapZones: stZones, isReplaying, summonCount, activateNibiru, resetSummonCount, nibiruSimulationEnabled, nibiruUsed, cardPropertyModifiers, ftkModeActive, setFtkModeActive, opponentLp, ftkVictory } = useGameStore();
     const effectiveActiveCardId = activeReplayInstanceId || activeEffectCardId;
     const isTargeting = targetingState.isOpen;
     const isSelectingZone = zoneSelectionState.isOpen;
@@ -244,7 +244,11 @@ export function Board() {
                 gridColumn: '7 / 8',
                 gridRow: '2 / 3',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: (isReplaying && effectiveActiveCardId && banished.includes(effectiveActiveCardId)) ? '0 0 15px 5px rgba(0, 255, 255, 0.8)' : 'none',
+                boxShadow: (isReplaying && effectiveActiveCardId && banished.includes(effectiveActiveCardId))
+                    ? (activeReplayEffectType === 'negated'
+                        ? '0 0 16px 5px rgba(255, 23, 68, 0.85)'
+                        : '0 0 16px 5px rgba(0, 229, 255, 0.8)')
+                    : 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}
@@ -257,7 +261,12 @@ export function Board() {
                 }}
             >
                 <Zone id="banished-zone" type="BANISHED" label={formatLog('ui_banished')} bgLabel="除外">
-                    {banished.length > 0 && renderCard(banished[banished.length - 1], false)}
+                    {banished.length > 0 && renderCard(
+                        (isReplaying && effectiveActiveCardId && banished.includes(effectiveActiveCardId))
+                            ? effectiveActiveCardId
+                            : banished[banished.length - 1],
+                        false
+                    )}
                     {banished.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'blue', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white', zIndex: 10 }}>{banished.length}</div>}
                 </Zone>
             </div>
@@ -267,7 +276,11 @@ export function Board() {
                 gridColumn: '7 / 8',
                 gridRow: '3 / 4',
                 cursor: (isTargeting || isSelectingZone) ? 'not-allowed' : 'pointer',
-                boxShadow: (isReplaying && effectiveActiveCardId && graveyard.includes(effectiveActiveCardId)) ? '0 0 15px 5px rgba(255, 0, 0, 0.8)' : 'none',
+                boxShadow: (isReplaying && effectiveActiveCardId && graveyard.includes(effectiveActiveCardId))
+                    ? (activeReplayEffectType === 'negated'
+                        ? '0 0 16px 5px rgba(255, 23, 68, 0.85)'
+                        : '0 0 16px 5px rgba(0, 229, 255, 0.8)')
+                    : 'none',
                 borderRadius: '8px',
                 transition: 'box-shadow 0.3s ease'
             }}
@@ -280,7 +293,12 @@ export function Board() {
                 }}
             >
                 <Zone id="graveyard-zone" type="GRAVEYARD" label={formatLog('ui_graveyard')} bgLabel="墓地">
-                    {graveyard.length > 0 && renderCard(graveyard[graveyard.length - 1], false)}
+                    {graveyard.length > 0 && renderCard(
+                        (isReplaying && effectiveActiveCardId && graveyard.includes(effectiveActiveCardId))
+                            ? effectiveActiveCardId
+                            : graveyard[graveyard.length - 1],
+                        false
+                    )}
                     {graveyard.length > 0 && <div style={{ position: 'absolute', top: -5, right: -5, background: 'red', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white', zIndex: 10 }}>{graveyard.length}</div>}
                 </Zone>
             </div>

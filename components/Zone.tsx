@@ -49,14 +49,10 @@ export function Zone({ id, type, index, children, label, bgLabel, style: customS
     const style: React.CSSProperties = {
         width: '90px',
         height: '130px',
-        border: isActiveReplayEffectZone 
-            ? '3px solid #ff0000' 
-            : (isValidTarget ? '2px solid #0f0' : '1px dashed var(--zone-border)'),
+        border: isValidTarget ? '2px solid #0f0' : '1px dashed var(--zone-border)',
         backgroundColor: isOver 
             ? 'rgba(255, 255, 255, 0.15)' 
-            : (isActiveReplayEffectZone 
-                ? 'rgba(255, 0, 0, 0.2)' 
-                : (isValidTarget ? 'rgba(0, 255, 0, 0.1)' : (fieldColor || 'var(--zone-bg)'))),
+            : (isValidTarget ? 'rgba(0, 255, 0, 0.1)' : (fieldColor || 'var(--zone-bg)')),
         borderRadius: '6px',
         display: 'flex',
         alignItems: 'center',
@@ -65,8 +61,8 @@ export function Zone({ id, type, index, children, label, bgLabel, style: customS
         margin: '4px',
         position: 'relative',
         cursor: isValidTarget ? 'pointer' : 'default',
-        zIndex: (isValidTarget || isActiveReplayEffectZone) ? 10 : 1, // Bring to front if selectable or active
-        boxShadow: isActiveReplayEffectZone ? '0 0 20px #ff0000' : 'none',
+        zIndex: (isValidTarget || isActiveReplayEffectZone) ? 10 : 1, // Keep z-index elevated so active card glow is not clipped
+        boxShadow: 'none',
     };
 
     return (
@@ -74,7 +70,6 @@ export function Zone({ id, type, index, children, label, bgLabel, style: customS
             ref={setNodeRef} 
             style={{ ...style, ...customStyle }} 
             onClick={handleClick}
-            className={isActiveReplayEffectZone ? 'active-effect-zone-glow' : ''}
         >
             {bgLabel && (
                 <span style={{

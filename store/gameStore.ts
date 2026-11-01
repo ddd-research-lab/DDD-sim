@@ -3420,6 +3420,7 @@ interface GameStore extends GameState {
     activeReplayCardId: string | null;
     activeReplayInstanceId: string | null;
     activeReplayZone: { type: ZoneType, index: number } | null;
+    activeReplayEffectType: 'activation' | 'negated' | null;
     replay: (startIndex?: number, skipSnapshot?: boolean) => Promise<void>;
     stopReplay: () => void;
     originalZoneOrder: string[] | null; // For GY/Banished display reset
@@ -3722,6 +3723,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     activeReplayCardId: null,
     activeReplayInstanceId: null,
     activeReplayZone: null,
+    activeReplayEffectType: null,
     modalQueue: [],
     pendingChain: [],
     pendingEffects: [],
@@ -5755,6 +5757,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
+            activeReplayEffectType: null,
             replayOriginalLogs: null,
             showPendulumCutIn: false,
             showHarmoniaCutIn: false,
@@ -7653,7 +7656,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 replayAnimations: null,
                 activeReplayCardId: null,
                 activeReplayInstanceId: null,
-                activeReplayZone: null
+                activeReplayZone: null,
+                activeReplayEffectType: null
             });
             const jumpLabel = logIndex < 0 ? '0' : (logIndex + 1).toString();
             get().addLog(formatLog('log_replay_jump', { index: jumpLabel }));
@@ -7683,6 +7687,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
+            activeReplayEffectType: null,
         });
     },
     replay: async (startIndex?: number, skipSnapshot = false) => {
@@ -7769,6 +7774,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
+            activeReplayEffectType: null,
         });
 
         // Helper: wait specified ms but stop immediately if replay is cancelled
@@ -8152,10 +8158,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 'c037': ['マルチャミー・フワロス', 'フワロス', 'Fuwalos'],
                 'c038': ['軌跡の魔術師', 'ビヨンド・ザ・ペンデュラム', 'ビヨンド', 'Beyond the Pendulum'],
                 'c039': ['ヴァイス・テュポーン', 'ヴァイステュポーン', 'Vice Typhon'],
-                'c040': ['契約書のリビルド', 'リビルド', 'Dark Contract Rebuild'],
+                'c040': ['DDリビルド', '契約書のリビルド', 'リビルド', 'DD Rebuild', 'Dark Contract Rebuild'],
                 'c041': ['疾風大王エグゼクティブ・アレクサンダー', '大王アレクサンダー', 'エグゼクティブ・アレクサンダー', 'High Gust King Alexander', 'High King Alexander'],
                 'c042': ['ナイトメア・スローン', 'スローン', 'Nightmare Throne', 'Throne'],
-                'c043': ['異次元の契約書', 'オカルティズム', 'Dark Contract with the Different Dimension'],
+                'c043': ['ダーク・オカルティズム', '異次元の契約書', 'オカルティズム', 'Dark Occultism', 'Dark Contract with the Different Dimension'],
                 'c044': ['双暁王カリ・ユガ', 'カリ・ユガ', 'カリユガ', 'Kali Yuga'],
                 'c045': ['調和ノ天救竜', 'ハルモニア', 'Harmonia'],
                 'c046': ['魔界特派員デスキャスター', 'デスキャスター', 'Muckraker From the Underworld', 'Muckraker'],
@@ -8222,11 +8228,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     const parenMatch = logText.match(parenRegex);
                     if (parenMatch) {
                         const insideParen = parenMatch[1];
+                        const effectSourcePart = insideParen.split(/[：:]/).pop() || insideParen;
                         let matchedId: string | null = null;
                         let maxLen = 0;
                         Object.keys(abbrevMap).forEach(cardId => {
                             abbrevMap[cardId].forEach(name => {
-                                if (insideParen.includes(name) && name.length > maxLen) {
+                                if (effectSourcePart.includes(name) && name.length > maxLen) {
                                     maxLen = name.length;
                                     matchedId = cardId;
                                 }
@@ -8272,8 +8279,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
 
             if (matchedCardId && !foundInstanceId) {
+                // Check if an instance of matchedCardId was banished from GY in this step (e.g. Necro Slime, Vice Typhon, Defense Soldier, DD Rebuild)
+                if (prevSnapshot?.graveyard && snapshot.banished && snapshot.cards) {
+                    const prevGy = prevSnapshot.graveyard;
+                    const banishedFromGyId = [...snapshot.banished].reverse().find((id: string) =>
+                        prevGy.includes(id) &&
+                        (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId)
+                    );
+                    if (banishedFromGyId) {
+                        foundInstanceId = banishedFromGyId;
+                    }
+                }
+
                 // If this is Impermanence cut-in, prioritize Monster Zones & EMZ
-                if (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => (l.includes('泡影') || l.includes('Impermanence')) && !isZeusNegate(l))) {
+                if (!foundInstanceId && (cutInToTrigger === 'impermanence' || newlyAddedLogs.some(l => (l.includes('泡影') || l.includes('Impermanence')) && !isZeusNegate(l)))) {
                     if (snapshot.extraMonsterZones && snapshot.cards) {
                         for (let idx = 0; idx < snapshot.extraMonsterZones.length; idx++) {
                             const id = snapshot.extraMonsterZones[idx];
@@ -8342,19 +8361,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 if (!foundInstanceId && snapshot.graveyard && snapshot.cards) {
-                    const inGraveId = snapshot.graveyard.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    const inGraveId = [...snapshot.graveyard].reverse().find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
                     if (inGraveId) {
                         foundInstanceId = inGraveId;
                     }
                 }
 
                 if (!foundInstanceId && snapshot.banished && snapshot.cards) {
-                    const inBanishedId = snapshot.banished.find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
+                    const inBanishedId = [...snapshot.banished].reverse().find((id: string) => (snapshot.cards?.[id]?.cardId === matchedCardId || get().cards[id]?.cardId === matchedCardId));
                     if (inBanishedId) {
                         foundInstanceId = inBanishedId;
                     }
                 }
             }
+
+            if (foundInstanceId && !foundZone) {
+                const mzIdx = snapshot.monsterZones?.indexOf(foundInstanceId) ?? -1;
+                const emzIdx = snapshot.extraMonsterZones?.indexOf(foundInstanceId) ?? -1;
+                const stzIdx = snapshot.spellTrapZones?.indexOf(foundInstanceId) ?? -1;
+                if (mzIdx !== -1) foundZone = { type: 'MONSTER_ZONE', index: mzIdx };
+                else if (emzIdx !== -1) foundZone = { type: 'EXTRA_MONSTER_ZONE', index: emzIdx };
+                else if (stzIdx !== -1) foundZone = { type: 'SPELL_TRAP_ZONE', index: stzIdx };
+                else if (snapshot.fieldZone === foundInstanceId) foundZone = { type: 'FIELD_ZONE', index: 0 };
+            }
+
+            const isNegatedCutIn = cutInToTrigger === 'ash' || cutInToTrigger === 'impermanence' || cutInToTrigger === 'impulse';
+            const isNegatedStepLog = newlyAddedLogs.some(l => (l.includes('無効') || l.includes('negated')) && !isZeusNegate(l));
+            const initialEffectType: 'activation' | 'negated' | null = matchedCardId
+                ? ((isNegatedStepLog && !isNegatedCutIn) ? 'negated' : 'activation')
+                : null;
 
             let currentMidSnapshot = prevSnapshot ? JSON.parse(JSON.stringify(prevSnapshot)) : null;
 
@@ -8391,6 +8426,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                          activeReplayCardId: matchedCardId,
                          activeReplayInstanceId: foundInstanceId,
                          activeReplayZone: foundZone,
+                         activeReplayEffectType: initialEffectType,
                      });
 
                     await waitReplay(currentAnimDuration);
@@ -8420,6 +8456,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 activeReplayCardId: matchedCardId,
                 activeReplayInstanceId: foundInstanceId,
                 activeReplayZone: foundZone,
+                activeReplayEffectType: initialEffectType,
             });
 
             // Trigger hand trap cut-ins (Impermanence, Ash, etc.) AFTER the monster is placed and highlighted
@@ -8428,9 +8465,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 await waitReplay(Math.min(200, currentPauseDuration));
                 if (!get().isReplaying) break;
 
-                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true });
-                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true });
-                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true });
+                if (cutInToTrigger === "ash") set({ showAshBlossomCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
+                if (cutInToTrigger === "impermanence") set({ showInfiniteImpermanenceCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
+                if (cutInToTrigger === "impulse") set({ showImpulseCutIn: true, activeReplayEffectType: matchedCardId ? 'negated' : null });
                 if (cutInToTrigger === "droll") set({ showDrollCutIn: true });
 
                 await waitReplay(1333);
@@ -8466,6 +8503,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 activeReplayCardId: null,
                 activeReplayInstanceId: null,
                 activeReplayZone: null,
+                activeReplayEffectType: null,
                 replayOriginalLogs: null,
                 currentStepIndex: fullHistory.length - 1
             });
@@ -8499,6 +8537,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 activeReplayCardId: null,
                 activeReplayInstanceId: null,
                 activeReplayZone: null,
+                activeReplayEffectType: null,
                 currentStepIndex: stoppedStep
             });
         }
@@ -8605,6 +8644,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeReplayCardId: null,
             activeReplayInstanceId: null,
             activeReplayZone: null,
+            activeReplayEffectType: null,
             replayOriginalLogs: null,
             showPendulumCutIn: false,
             showAshBlossomCutIn: false,
