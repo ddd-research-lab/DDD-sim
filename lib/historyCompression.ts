@@ -17,7 +17,6 @@ const UI_ONLY_FIELDS: (keyof GameState)[] = [
     'showNibiruCutIn',
     'isLinkSummoningActive',
     'isMaterialMove',
-    'isTellBuffActive',
     'isHistoryBatching',
 ];
 
@@ -84,6 +83,9 @@ export function decompressHistory(compressed: CompressedHistory): Partial<GameSt
     }
     return snapshots.map(snap => ({
         ...snap,
+        isTellBuffActive: snap.isTellBuffActive !== undefined ? snap.isTellBuffActive : (typeof snap.lp === 'number' && snap.lp < 8000),
+        opponentLp: snap.opponentLp ?? 8000,
+        ftkVictory: snap.ftkVictory ?? false,
         cards: enrichedCards,
     }));
 }

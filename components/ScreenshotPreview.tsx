@@ -17,7 +17,10 @@ export const ScreenshotPreview = forwardRef<HTMLDivElement>((props, ref) => {
         cards,
         backgroundColor,
         fieldColor,
-        useGradient
+        useGradient,
+        ftkModeActive,
+        opponentLp,
+        ftkVictory
     } = store;
 
     // Filter Extra Deck: Only show cards that are FACE UP (added to EX Deck later)
@@ -121,6 +124,29 @@ export const ScreenshotPreview = forwardRef<HTMLDivElement>((props, ref) => {
                         justifyContent: 'center',
                         alignItems: 'center'
                     }}>
+                        {ftkModeActive && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '12px',
+                                right: '16px',
+                                background: 'rgba(17, 24, 39, 0.9)',
+                                border: ftkVictory ? '2px solid #eab308' : '2px solid #dc2626',
+                                borderRadius: '8px',
+                                padding: '6px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                zIndex: 10
+                            }}>
+                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#f87171', letterSpacing: '1px' }}>OPPONENT LP</span>
+                                <span style={{ fontSize: '20px', fontWeight: 900, fontFamily: 'monospace', color: ftkVictory ? '#facc15' : '#ffffff' }}>
+                                    {opponentLp}
+                                </span>
+                                {ftkVictory && (
+                                    <span style={{ fontSize: '11px', fontWeight: 900, color: '#facc15', letterSpacing: '2px' }}>VICTORY!</span>
+                                )}
+                            </div>
+                        )}
                         {/* Grid Layout for Field */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 100px)', gap: '20px', padding: '20px' }}>
                             {/* Monster Zones */}

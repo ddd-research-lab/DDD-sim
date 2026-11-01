@@ -2089,7 +2089,7 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
             }, true, selfId);
         }
         // [Manual Effect] Detach is UNLIMITED (Removed Mill - just detach as per User feedback)
-        if (store.isTellBuffActive && (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && !fromLocation) {
+        if ((store.isTellBuffActive || store.lp < 8000) && (store.monsterZones.includes(selfId) || store.extraMonsterZones.includes(selfId)) && !fromLocation) {
             if (store.turnEffectUsage[`c021_detach_${selfId}`]) {
                 return;
             }
@@ -2098,20 +2098,27 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
                 store.startEffectSelection(formatLog('prompt_tell_detach'), [{ label: formatLog('ui_yes'), value: 'yes' }, { label: formatLog('ui_no'), value: 'no' }], (choice: string) => {
                     if (choice === 'yes') {
                         store.startEffectSelection(formatLog('prompt_select_material'), materials.map((mid: string) => ({ label: getCardName(store.cards[mid], store.language), value: mid })), (matId: string) => {
-                            store.addTurnEffectUsage(`c021_detach_${selfId}`, selfId);
-                            const costName = getCardName(store.cards[matId], store.language);
-                            store.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
-                            store.addLog(formatLog('log_tell_detach', { amount: '1000', cost: costName }));
-                            useGameStore.getState().pushHistory(true);
+                            const currentStore = useGameStore.getState();
+                            currentStore.addTurnEffectUsage(`c021_detach_${selfId}`, selfId);
+                            const costName = getCardName(currentStore.cards[matId], currentStore.language);
+                            currentStore.moveCard(matId, 'GRAVEYARD', 0, 'MATERIAL', false, false, undefined, true);
+                            currentStore.addLog(formatLog('log_tell_detach', { amount: '1000', cost: costName }));
 
-                            if (store.ftkModeActive) {
-                                const newLp = Math.max(0, useGameStore.getState().opponentLp - 1000);
-                                useGameStore.setState({ opponentLp: newLp });
-                                if (newLp === 0) {
-                                    useGameStore.setState({ ftkVictory: true });
-                                    useGameStore.getState().addLog(store.language === 'ja' ? '【勝利】相手のLPが0になりました！ワンキル成功です！' : '【Victory】Opponent LP reached 0! FTK successful!');
-                                }
+                            const latestState = useGameStore.getState();
+                            const prevLp = typeof latestState.opponentLp === 'number' ? latestState.opponentLp : 8000;
+                            const newLp = Math.max(0, prevLp - 1000);
+                            const reachedZero = newLp === 0;
+
+                            useGameStore.setState({
+                                opponentLp: newLp,
+                                ftkVictory: latestState.ftkModeActive ? reachedZero : false
+                            });
+
+                            if (latestState.ftkModeActive && reachedZero && prevLp > 0) {
+                                useGameStore.getState().addLog(latestState.language === 'ja' ? '【勝利】相手のLPが0になりました！ワンキル成功です！' : '【Victory】Opponent LP reached 0! FTK successful!');
                             }
+
+                            useGameStore.getState().pushHistory(true);
                             // User feedback: Field effect is ONLY detaching material.
                             // OCG ATK/DEF loss not implemented unless requested.
                         }, false, selfId);
@@ -3512,10 +3519,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setImpulseSimulationEnabled: (enabled: boolean) => set({ impulseSimulationEnabled: enabled }),
     setSelectedDeckCardId: (id) => set({ selectedDeckCardId: id }),
     selectedDeckCardId: null,
-    setFtkModeActive: (active) => set({
-        ftkModeActive: active,
-        opponentLp: 8000,
-        ftkVictory: false
+    setFtkModeActive: (active) => set((state) => {
+        const isTellBurnLog = (l: string) => l.includes('1000バーン（DDD狙撃王テル効果');
+        const currentBurnCount = (state.logs || []).filter(isTellBurnLog).length;
+        const computedLp = Math.max(0, 8000 - currentBurnCount * 1000);
+        const nextLp = (typeof state.opponentLp === 'number' && state.opponentLp < 8000)
+            ? Math.min(state.opponentLp, computedLp)
+            : computedLp;
+
+        const allKnownLogs = state.replayOriginalLogs
+            || (state.jumpHistory.length > 0 && state.jumpHistory[0].logs)
+            || (state.historySource && state.historySource[state.historySource.length - 1]?.logs)
+            || state.logs
+            || [];
+        const chronologicalLogs = [...allKnownLogs].reverse();
+
+        const syncSnapshots = (snaps?: Partial<GameState>[]) => {
+            if (!snaps) return snaps;
+            return snaps.map(snap => {
+                const stepLogs = Array.isArray(snap.logs)
+                    ? snap.logs
+                    : chronologicalLogs.slice(0, snap.logCount ?? 0);
+                const stepBurnCount = stepLogs.filter(isTellBurnLog).length;
+                const stepComputedLp = Math.max(0, 8000 - stepBurnCount * 1000);
+                const snapLp = (typeof snap.opponentLp === 'number' && snap.opponentLp < 8000)
+                    ? Math.min(snap.opponentLp, stepComputedLp)
+                    : stepComputedLp;
+                return {
+                    ...snap,
+                    ftkModeActive: active,
+                    opponentLp: snapLp,
+                    ftkVictory: active && snapLp === 0,
+                };
+            });
+        };
+
+        return {
+            ftkModeActive: active,
+            opponentLp: nextLp,
+            ftkVictory: active && nextLp === 0,
+            history: syncSnapshots(state.history) || [],
+            historySource: syncSnapshots(state.historySource),
+            jumpHistory: state.jumpHistory.map(jh => ({
+                ...jh,
+                ftkModeActive: active,
+                history: syncSnapshots(jh.history)
+            }))
+        };
     }),
     setDialogSize: (size) => set({ dialogSize: size }),
 
@@ -3870,6 +3920,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             fieldZone: null,
             extraMonsterZones: [null, null],
             lp: 8000,
+            opponentLp: 8000,
+            ftkVictory: false,
             normalSummonUsed: false,
             materials: {},
             backgroundColor: '#FFFFFF', // Default White
@@ -5680,6 +5732,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             extraMonsterZones: [null, null],
             materials: {},
             lp: 8000,
+            opponentLp: 8000,
+            ftkVictory: false,
             normalSummonUsed: false,
             turnEffectUsage: {},
             cardFlags: {},
@@ -5744,6 +5798,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             normalSummonUsed: false,
             pendulumSummonCount: 0,
             beyondLockActive: false,
+            isTellBuffActive: false,
             summonCount: 0,
             ashBlossomUsed: false,
             infiniteImpermanenceUsed: false,
@@ -6765,7 +6820,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     changeLP: (amount) => {
         get().pushHistory();
-        set((state) => ({ lp: state.lp + amount }));
+        set((state) => ({
+            lp: state.lp + amount,
+            ...(amount < 0 ? { isTellBuffActive: true } : {})
+        }));
     },
 
     setCardFlag: (cardId, flag) => set((state) => {
@@ -8478,14 +8536,42 @@ export const useGameStore = create<GameStore>((set, get) => ({
     },
 
     loadArchive: (archive: any) => {
-        let history = archive.history;
+        let rawHistory = archive.history;
 
         // 解凍処理: compressedHistory が存在し、かつ history が空または無効な場合に解凍を行う
         if (isCompressedHistory(archive.compressedHistory)) {
-            history = decompressHistory(archive.compressedHistory);
+            rawHistory = decompressHistory(archive.compressedHistory);
         }
 
-        if (!history || !Array.isArray(history) || history.length === 0) return;
+        if (!rawHistory || !Array.isArray(rawHistory) || rawHistory.length === 0) return;
+
+        const allLogs: string[] = archive.logs || rawHistory[rawHistory.length - 1]?.logs || [];
+        const chronologicalLogs = [...allLogs].reverse();
+        const isTellBurnLog = (l: string) => l.includes('1000バーン（DDD狙撃王テル効果');
+        const isSelfDamageLog = (l: string) => l.includes('1000ダメージ') || l.includes('ダメージを受ける');
+        const totalBurns = allLogs.filter(isTellBurnLog).length;
+        const routeFtkActive = Boolean(rawHistory[rawHistory.length - 1]?.ftkModeActive || totalBurns >= 8 || get().ftkModeActive);
+
+        const history = rawHistory.map((snap: Partial<GameState>) => {
+            const stepLogs = Array.isArray(snap.logs)
+                ? snap.logs
+                : chronologicalLogs.slice(0, snap.logCount ?? 0);
+            const burnCount = stepLogs.filter(isTellBurnLog).length;
+            const hasSelfDamage = stepLogs.some(isSelfDamageLog) || (typeof snap.lp === 'number' && snap.lp < 8000);
+            const computedLp = Math.max(0, 8000 - burnCount * 1000);
+            const snapLp = (typeof snap.opponentLp === 'number' && snap.opponentLp < 8000)
+                ? Math.min(snap.opponentLp, computedLp)
+                : computedLp;
+            const ftkActive = snap.ftkModeActive ?? routeFtkActive;
+
+            return {
+                ...snap,
+                isTellBuffActive: snap.isTellBuffActive !== undefined ? (snap.isTellBuffActive || hasSelfDamage) : hasSelfDamage,
+                ftkModeActive: ftkActive,
+                opponentLp: snapLp,
+                ftkVictory: Boolean(ftkActive && snapLp === 0),
+            };
+        });
 
         // Reset to final state of the replay per user request
         const initialState = history[history.length - 1];
@@ -8514,7 +8600,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Ensure derived state / UI is clean
             isReplaying: false,
             currentStepIndex: history.length - 1,
-            logs: archive.logs || initialState.logs || [],
+            logs: allLogs,
             replayAnimations: null,
             activeReplayCardId: null,
             activeReplayInstanceId: null,
