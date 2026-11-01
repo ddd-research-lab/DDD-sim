@@ -5040,12 +5040,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 const errorLogStr = formatLog('log_error_condition');
                 const materialLogStr = formatLog('log_error_material');
                 const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+                const returnFromJumpLogStr = formatLog('log_return_from_jump');
+                const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+                const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+                const undoEmptyLogStr = formatLog('log_undo_empty');
                 const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
 
                 const filteredLogs = state.logs.filter(l => {
                     const isError = l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr;
+                    const isSystem = l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr || (l.startsWith('ログ #') && l.endsWith('へジャンプ'));
                     const isHopt = l.includes(hoptSuffix);
-                    return !isError && !isHopt;
+                    return !isError && !isSystem && !isHopt;
                 });
                 const logs = (skipLogging || state.isMaterialMove || skipLog || !logKey || shouldSuppressLog) ? filteredLogs : [combinedLog, ...filteredLogs];
 
@@ -5296,6 +5301,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 get().processPendingEffects();
                 get().processUiQueue();
                 useGameStore.setState({ isBatching: false, isLinkSummoningActive: false, lastEffectSourceId: null });
+                const afterState = get();
+                const isModalOpen = afterState.effectSelectionState.isOpen || afterState.targetingState.isOpen || afterState.searchState.isOpen || afterState.zoneSelectionState.isOpen;
+                if (isModalOpen && !afterState.isHistoryBatching && !afterState.isMaterialMove && !suppressHistoryPush && !skipLog && afterState.logs.length > startState.logs.length) {
+                    const lastSnap = afterState.history[afterState.history.length - 1];
+                    const lastSnapLogCount = lastSnap ? (lastSnap.logs ? lastSnap.logs.length : (lastSnap.logCount ?? 0)) : -1;
+                    if (afterState.logs.length > lastSnapLogCount) {
+                        get().pushHistory(true);
+                    }
+                }
             }
         }
     },
@@ -5325,14 +5339,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const errorLogStr = formatLog('log_error_condition');
         const materialLogStr = formatLog('log_error_material');
         const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+        const returnFromJumpLogStr = formatLog('log_return_from_jump');
+        const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+        const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+        const undoEmptyLogStr = formatLog('log_undo_empty');
         const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
-        const startingHandPrefix = '初動：';
         // Remove all "transient" (unnumbered) logs when adding ANY new log
         const filteredLogs = state.logs.filter(l => {
             const isError = l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr;
+            const isSystem = l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr || (l.startsWith('ログ #') && l.endsWith('へジャンプ'));
             const isHopt = l.includes(hoptSuffix);
             // Starting hand logs (startsWith '初動：') are now persistent (not filtered out)
-            return !isError && !isHopt;
+            return !isError && !isSystem && !isHopt;
         });
         return { logs: [message, ...filteredLogs] };
     }),
@@ -6922,6 +6940,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
             // Snapshot
             const { history, ...rest } = state;
 
+            const errorLogStr = formatLog('log_error_condition');
+            const materialLogStr = formatLog('log_error_material');
+            const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+            const returnFromJumpLogStr = formatLog('log_return_from_jump');
+            const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+            const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+            const undoEmptyLogStr = formatLog('log_undo_empty');
+            const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
+
+            const cleanLogs = (state.logs || []).filter(l => {
+                const isError = l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr;
+                const isSystem = l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr || (l.startsWith('ログ #') && l.endsWith('へジャンプ'));
+                const isHopt = l.includes(hoptSuffix);
+                return !isError && !isSystem && !isHopt;
+            });
+
             const snapshot: Partial<GameState> = {
                 deck: state.deck,
                 cards: state.cards,
@@ -6936,7 +6970,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 lp: state.lp,
                 normalSummonUsed: state.normalSummonUsed,
                 materials: JSON.parse(JSON.stringify(state.materials)), // Deep copy needed
-                logs: [...state.logs],
+                logs: cleanLogs,
                 turnEffectUsage: { ...state.turnEffectUsage },
                 cardFlags: JSON.parse(JSON.stringify(state.cardFlags)),
                 pendulumSummonCount: state.pendulumSummonCount,
@@ -6946,7 +6980,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 isTellBuffActive: state.isTellBuffActive,
                 lastEffectSourceId: state.lastEffectSourceId, // Save this for replay highlighting
                 activeEffectCardId: state.activeEffectCardId, // Save active effect card for replay
-                logCount: state.logs ? state.logs.length : 0, // Store log count instead of full logs array
+                logCount: cleanLogs.length, // Store log count instead of full logs array
                 fieldColor: state.fieldColor,
                 backgroundColor: state.backgroundColor,
                 useGradient: state.useGradient,
@@ -7295,15 +7329,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
             return;
         }
 
-        // Current log count
-        const currentLogCount = state.logs ? state.logs.length : 0;
+        const isSystemOrErrorLog = (l: string) => {
+            const errorLogStr = formatLog('log_error_condition');
+            const materialLogStr = formatLog('log_error_material');
+            const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+            const returnFromJumpLogStr = formatLog('log_return_from_jump');
+            const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+            const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+            const undoEmptyLogStr = formatLog('log_undo_empty');
+            const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
+            return l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr ||
+                l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr ||
+                (l.startsWith('ログ #') && l.endsWith('へジャンプ')) || l.includes(hoptSuffix);
+        };
+
+        // Current log count (excluding transient/system logs)
+        const cleanCurrentLogs = (state.logs || []).filter(l => !isSystemOrErrorLog(l));
+        const currentLogCount = cleanCurrentLogs.length;
 
         // Walk backwards through history to find the FIRST snapshot that has FEWER logs than current.
         // This effectively reverts the game to the state BEFORE the last log entry was added.
         let targetIndex = state.history.length - 1;
         while (targetIndex >= 0) {
             const snap = state.history[targetIndex];
-            const snapLogCount = snap.logs ? snap.logs.length : (snap.logCount ?? 0);
+            const snapLogCount = snap.logs
+                ? snap.logs.filter((l: string) => !isSystemOrErrorLog(l)).length
+                : (snap.logCount ?? 0);
             if (snapLogCount < currentLogCount) break;
             targetIndex--;
         }
@@ -7317,8 +7368,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const previous = state.history[targetIndex];
         const newHistory = state.history.slice(0, targetIndex);
 
+        const allKnownLogs = state.replayOriginalLogs
+            || (state.jumpHistory.length > 0 && state.jumpHistory[0].logs)
+            || state.logs
+            || [];
+        const cleanKnownLogs = allKnownLogs.filter((l: string) => !isSystemOrErrorLog(l));
+        const chronologicalKnownLogs = [...cleanKnownLogs].reverse();
+        const prevLogCount = previous.logs
+            ? previous.logs.filter((l: string) => !isSystemOrErrorLog(l)).length
+            : (previous.logCount ?? 0);
+        const restoredLogs = previous.logs
+            ? previous.logs.filter((l: string) => !isSystemOrErrorLog(l))
+            : chronologicalKnownLogs.slice(0, prevLogCount).reverse();
+
+        const restoredCards = previous.cards ? { ...state.cards, ...previous.cards } : state.cards;
+
         set({
             ...previous,
+            cards: restoredCards,
+            logs: restoredLogs,
             history: newHistory,
             // Ensure UI states are reset to clean
             isDragging: false,
@@ -7330,6 +7398,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             modalQueue: [],
             pendingChain: [],
             isBatching: false,
+            activeEffectCardId: null,
             currentStepIndex: -1, // Reset currentStepIndex on undo
         });
     },
@@ -7369,6 +7438,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
             get().stopReplay();
         }
 
+        const isSystemOrErrorLog = (l: string) => {
+            const errorLogStr = formatLog('log_error_condition');
+            const materialLogStr = formatLog('log_error_material');
+            const arcCrisisFailLogStr = formatLog('log_arc_crisis_fail');
+            const returnFromJumpLogStr = formatLog('log_return_from_jump');
+            const alreadyAtStepLogStr = formatLog('log_sys_already_at_step');
+            const stateNotFoundLogStr = formatLog('log_sys_state_not_found');
+            const undoEmptyLogStr = formatLog('log_undo_empty');
+            const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
+            return l === errorLogStr || l === materialLogStr || l === arcCrisisFailLogStr ||
+                l === returnFromJumpLogStr || l === alreadyAtStepLogStr || l === stateNotFoundLogStr || l === undoEmptyLogStr ||
+                (l.startsWith('ログ #') && l.endsWith('へジャンプ')) || l.includes(hoptSuffix);
+        };
+
+        // Ensure latest live state is captured in history before jumping for the first time
+        const preJumpState = get();
+        if (preJumpState.currentStepIndex < 0 && !preJumpState.isHistoryBatching && preJumpState.jumpHistory.length === 0) {
+            const cleanLiveLogs = (preJumpState.logs || []).filter(l => !isSystemOrErrorLog(l));
+            const lastSnap = preJumpState.history[preJumpState.history.length - 1];
+            const lastSnapLogCount = lastSnap
+                ? (lastSnap.logs ? lastSnap.logs.filter((l: string) => !isSystemOrErrorLog(l)).length : (lastSnap.logCount ?? 0))
+                : -1;
+            if (cleanLiveLogs.length > lastSnapLogCount) {
+                get().pushHistory(true);
+            }
+        }
+
         const freshState = get();
         const fullHistory = (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].history)
             ? freshState.jumpHistory[0].history
@@ -7379,21 +7475,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
             return;
         }
 
-        const targetLogNumber = logIndex + 1; // 1-based log target
+        // Determine complete logs to preserve (filtered of transient/system logs)
+        const rawAllLogs = freshState.replayOriginalLogs
+            || (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].logs)
+            || fullHistory[fullHistory.length - 1]?.logs
+            || freshState.logs
+            || [];
+        const allLogs = rawAllLogs.filter((l: string) => !isSystemOrErrorLog(l));
+        const startingHandCount = allLogs.filter((l: string) => l.startsWith('初動：')).length;
+
+        // logIndex < 0 means jumping to starting hand state ("初動：")
+        const targetLogNumber = logIndex < 0
+            ? startingHandCount
+            : startingHandCount + logIndex + 1;
+
+        const getSnapLogCount = (h: any) => {
+            if (Array.isArray(h.logs)) {
+                return h.logs.filter((l: string) => !isSystemOrErrorLog(l)).length;
+            }
+            return h.logCount ?? 0;
+        };
 
         // Find the snapshot corresponding to targetLogNumber
-        // 1. Try exact match first: snapshot where log count === targetLogNumber
-        let targetState: any = fullHistory.find(h => {
-            const count = h.logs ? h.logs.length : (h.logCount ?? 0);
-            return count === targetLogNumber;
-        });
+        // 1. Try exact match first: first snapshot where log count === targetLogNumber
+        let targetState: any = fullHistory.find(h => getSnapLogCount(h) === targetLogNumber);
 
         // 2. If not found (e.g. multiple logs were added in a single step), find first snapshot where count >= targetLogNumber
         if (!targetState) {
-            targetState = fullHistory.find(h => {
-                const count = h.logs ? h.logs.length : (h.logCount ?? 0);
-                return count >= targetLogNumber;
-            });
+            targetState = fullHistory.find(h => getSnapLogCount(h) >= targetLogNumber);
         }
 
         // 3. Fallback: If targetLogNumber is beyond all snapshots, use the last snapshot
@@ -7403,11 +7512,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         if (targetState) {
             const historyIndex = fullHistory.indexOf(targetState);
-
-            // Determine complete logs to preserve
-            const allLogs = freshState.replayOriginalLogs 
-                || (freshState.jumpHistory.length > 0 && freshState.jumpHistory[0].logs)
-                || freshState.logs;
 
             const currentSnapshot: Partial<GameState> = {
                 deck: freshState.deck,
@@ -7441,11 +7545,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
             };
 
             const newHistory = fullHistory.slice(0, historyIndex >= 0 ? historyIndex : fullHistory.length);
-            const restoredCards = targetState.cards ? { ...freshState.cards, ...targetState.cards } : freshState.cards;
+            const rawRestoredCards = targetState.cards ? { ...freshState.cards, ...targetState.cards } : freshState.cards;
+            const restoredCards: { [id: string]: Card } = {};
+            Object.entries(rawRestoredCards || {}).forEach(([id, card]: [string, any]) => {
+                if (!card) return;
+                const dbDef = (card.cardId && CARD_DATABASE[card.cardId]) ? CARD_DATABASE[card.cardId] : null;
+                restoredCards[id] = {
+                    ...(dbDef || {}),
+                    ...card,
+                    imageUrl: card.imageUrl || dbDef?.imageUrl,
+                    name: card.name || dbDef?.name || '',
+                    nameJa: card.nameJa || dbDef?.nameJa || '',
+                    description: card.description || dbDef?.description || ''
+                };
+            });
+
+            const actualLogCount = getSnapLogCount(targetState);
+            const chronologicalAllLogs = [...allLogs].reverse();
+            const restoredLogs = Array.isArray(targetState.logs)
+                ? targetState.logs.filter((l: string) => !isSystemOrErrorLog(l))
+                : chronologicalAllLogs.slice(0, actualLogCount).reverse();
 
             set({
                 ...targetState,
                 cards: restoredCards,
+                logs: restoredLogs,
                 history: newHistory,
                 historySource: fullHistory,
                 jumpHistory: [...freshState.jumpHistory, currentSnapshot],
@@ -7459,6 +7583,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 modalQueue: [],
                 pendingChain: [],
                 isBatching: false,
+                activeEffectCardId: null,
                 currentStepIndex: historyIndex,
                 isReplaying: false,
                 replayAnimations: null,
@@ -7466,9 +7591,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 activeReplayInstanceId: null,
                 activeReplayZone: null
             });
-            get().addLog(formatLog('log_replay_jump', { index: (logIndex + 1).toString() }));
+            const jumpLabel = logIndex < 0 ? '0' : (logIndex + 1).toString();
+            get().addLog(formatLog('log_replay_jump', { index: jumpLabel }));
         } else {
-            if (freshState.logs.length === logIndex + 1) {
+            if (freshState.logs.length === targetLogNumber) {
                 get().addLog(formatLog('log_sys_already_at_step'));
             } else {
                 get().addLog(formatLog('log_sys_state_not_found'));
@@ -8248,8 +8374,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Reset to final state of the replay per user request
         const initialState = history[history.length - 1];
+        const enrichedCards: { [id: string]: Card } = {};
+        const rawCards = initialState.cards || get().cards || {};
+        Object.entries(rawCards).forEach(([id, card]: [string, any]) => {
+            if (!card) return;
+            const dbDef = (card.cardId && CARD_DATABASE[card.cardId]) ? CARD_DATABASE[card.cardId] : null;
+            enrichedCards[id] = {
+                ...(dbDef || {}),
+                ...card,
+                imageUrl: card.imageUrl || dbDef?.imageUrl,
+                name: card.name || dbDef?.name || '',
+                nameJa: card.nameJa || dbDef?.nameJa || '',
+                description: card.description || dbDef?.description || ''
+            };
+        });
+
         set({
             ...initialState,
+            cards: enrichedCards,
             history: history,
             historySource: history,
             jumpHistory: [],

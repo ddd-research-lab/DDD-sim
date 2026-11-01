@@ -430,13 +430,24 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                             <button
                                 onClick={() => {
                                     let displayIdx = 1;
+                                    const isSystemOrErrorLog = (cleaned: string) => {
+                                        return cleaned === cleanLog(formatLog('log_error_condition'))
+                                            || cleaned.includes('の効果は既に使用されています（ターン1回）')
+                                            || cleaned === cleanLog(formatLog('log_return_from_jump'))
+                                            || cleaned === cleanLog(formatLog('log_sys_already_at_step'))
+                                            || cleaned === cleanLog(formatLog('log_sys_state_not_found'))
+                                            || cleaned === cleanLog(formatLog('log_undo_empty'))
+                                            || (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'));
+                                    };
                                     // Process in display order (reversed)
-                                    const logText = [...archive.logs].reverse().map((log) => {
-                                        const cleaned = cleanLog(log);
-                                        const text = useAbbreviation ? applyAbbreviations(cleaned) : cleaned;
-                                        if (text.startsWith('初動：')) return text;
-                                        return `[${displayIdx++}] ${text}`;
-                                    }).join('\n');
+                                    const logText = [...archive.logs].reverse()
+                                        .filter((log) => !isSystemOrErrorLog(cleanLog(log)))
+                                        .map((log) => {
+                                            const cleaned = cleanLog(log);
+                                            const text = useAbbreviation ? applyAbbreviations(cleaned) : cleaned;
+                                            if (text.startsWith('初動：')) return text;
+                                            return `[${displayIdx++}] ${text}`;
+                                        }).join('\n');
                                     navigator.clipboard.writeText(logText).then(() => {
                                         alert('ログをコピーしました');
                                     }).catch(err => {
@@ -460,13 +471,24 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                     <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#111', padding: '10px', fontSize: '12px', fontFamily: 'monospace' }}>
                         {(() => {
                             let displayIdx = 1;
+                            const isSystemOrErrorLog = (cleaned: string) => {
+                                return cleaned === cleanLog(formatLog('log_error_condition'))
+                                    || cleaned.includes('の効果は既に使用されています（ターン1回）')
+                                    || cleaned === cleanLog(formatLog('log_return_from_jump'))
+                                    || cleaned === cleanLog(formatLog('log_sys_already_at_step'))
+                                    || cleaned === cleanLog(formatLog('log_sys_state_not_found'))
+                                    || cleaned === cleanLog(formatLog('log_undo_empty'))
+                                    || (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'));
+                            };
                             // Reverse first, then map to apply numbering from the top
-                            const displayLogs = [...archive.logs].reverse().map((log) => {
-                                const cleaned = cleanLog(log);
-                                const text = useAbbreviation ? applyAbbreviations(cleaned) : cleaned;
-                                if (text.startsWith('初動：')) return { log: text, index: null };
-                                return { log: text, index: displayIdx++ };
-                            });
+                            const displayLogs = [...archive.logs].reverse()
+                                .filter((log) => !isSystemOrErrorLog(cleanLog(log)))
+                                .map((log) => {
+                                    const cleaned = cleanLog(log);
+                                    const text = useAbbreviation ? applyAbbreviations(cleaned) : cleaned;
+                                    if (text.startsWith('初動：')) return { log: text, index: null };
+                                    return { log: text, index: displayIdx++ };
+                                });
 
                             return displayLogs.map((item, i) => {
                                 return (
@@ -476,7 +498,7 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                                             if (item.index !== null) {
                                                 router.push(`/?replayId=${id}&step=${item.index}`);
                                             } else {
-                                                router.push(`/?replayId=${id}`);
+                                                router.push(`/?replayId=${id}&step=0`);
                                             }
                                         }}
                                         style={{

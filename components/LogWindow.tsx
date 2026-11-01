@@ -41,12 +41,25 @@ export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, us
     };
 
     const errorConditionLog = cleanLog(formatLog('log_error_condition'));
+    const returnFromJumpLog = cleanLog(formatLog('log_return_from_jump'));
+    const alreadyAtStepLog = cleanLog(formatLog('log_sys_already_at_step'));
+    const stateNotFoundLog = cleanLog(formatLog('log_sys_state_not_found'));
+    const undoEmptyLog = cleanLog(formatLog('log_undo_empty'));
     const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
     const startingHandPrefix = '初動：';
 
     const isTransient = (logText: string) => {
         const cleaned = cleanLog(logText);
-        return cleaned === errorConditionLog || cleaned.includes(hoptSuffix) || cleaned.startsWith(startingHandPrefix);
+        return (
+            cleaned === errorConditionLog ||
+            cleaned === returnFromJumpLog ||
+            cleaned === alreadyAtStepLog ||
+            cleaned === stateNotFoundLog ||
+            cleaned === undoEmptyLog ||
+            cleaned.includes(hoptSuffix) ||
+            cleaned.startsWith(startingHandPrefix) ||
+            (cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ'))
+        );
     };
 
     let currentDisplayIndex = logs.filter(l => !isTransient(l)).length;
@@ -56,11 +69,13 @@ export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, us
         const displayIndex = transient ? null : currentDisplayIndex--;
         const cleaned = cleanLog(log);
         const displayText = (useAbbreviation && applyAbbreviations) ? applyAbbreviations(cleaned) : cleaned;
+        const isStartingHand = cleaned.startsWith(startingHandPrefix);
         return {
             log: displayText,
             displayIndex,
             originalIndex: i,
-            transient
+            transient,
+            isStartingHand
         };
     });
 
@@ -112,28 +127,36 @@ export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, us
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                {displayedLogs.map(({ log, displayIndex, originalIndex }, i) => (
-                    <div
-                        key={i}
-                        onClick={() => {
-                            if (isReplaying) {
-                                useGameStore.getState().stopReplay();
-                            }
-                            jumpToLog(originalIndex);
-                        }}
-                        style={{
-                            borderBottom: '1px solid #333',
-                            paddingBottom: '2px',
-                            cursor: 'pointer',
-                            opacity: 1,
-                        }}
-                        className="hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                        title="クリックしてこの状態にジャンプ"
-                    >
-                        {displayIndex !== null && <span style={{ color: '#888' }}>[{displayIndex}] </span>}
-                        {log}
-                    </div>
-                ))}
+                {displayedLogs.map(({ log, displayIndex, isStartingHand }, i) => {
+                    const canJump = displayIndex !== null || isStartingHand;
+                    return (
+                        <div
+                            key={i}
+                            onClick={() => {
+                                if (!canJump) return;
+                                if (isReplaying) {
+                                    useGameStore.getState().stopReplay();
+                                }
+                                if (displayIndex !== null) {
+                                    jumpToLog(displayIndex - 1);
+                                } else if (isStartingHand) {
+                                    jumpToLog(-1);
+                                }
+                            }}
+                            style={{
+                                borderBottom: '1px solid #333',
+                                paddingBottom: '2px',
+                                cursor: canJump ? 'pointer' : 'default',
+                                opacity: 1,
+                            }}
+                            className={canJump ? "hover:bg-white/10 hover:text-white transition-colors cursor-pointer" : ""}
+                            title={canJump ? "クリックしてこの状態にジャンプ" : undefined}
+                        >
+                            {displayIndex !== null && <span style={{ color: '#888' }}>[{displayIndex}] </span>}
+                            {log}
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Action Buttons: Save & Archive */}

@@ -42,11 +42,11 @@ function ReplayLoader() {
       fetch(`/api/archive/${replayId}`)
         .then(res => res.json())
         .then(data => {
-          if (data && data.history) {
+          if (data && (data.compressedHistory || (data.history && data.history.length > 0))) {
             loadArchive(data);
-            if (step) {
+            if (step !== null) {
               const stepNum = parseInt(step, 10);
-              if (!isNaN(stepNum) && stepNum >= 1) {
+              if (!isNaN(stepNum) && stepNum >= 0) {
                 setTimeout(() => {
                   useGameStore.getState().jumpToLog(stepNum - 1);
                 }, 50);
@@ -350,10 +350,22 @@ export default function Home() {
     const errorConditionLog = cleanLog(formatLog('log_error_condition'));
     const hoptSuffix = 'の効果は既に使用されています（ターン1回）';
     const startingHandPrefix = '初動：';
+    const returnFromJumpLog = cleanLog(formatLog('log_return_from_jump'));
+    const alreadyAtStepLog = cleanLog(formatLog('log_sys_already_at_step'));
+    const stateNotFoundLog = cleanLog(formatLog('log_sys_state_not_found'));
+    const undoEmptyLog = cleanLog(formatLog('log_undo_empty'));
 
     const isTransient = (logText: string) => {
       const cleaned = cleanLog(logText);
-      return cleaned === errorConditionLog || cleaned.includes(hoptSuffix) || cleaned.startsWith(startingHandPrefix);
+      const isJumpLog = cleaned.startsWith('ログ #') && cleaned.endsWith('へジャンプ');
+      return cleaned === errorConditionLog
+        || cleaned.includes(hoptSuffix)
+        || cleaned.startsWith(startingHandPrefix)
+        || cleaned === returnFromJumpLog
+        || cleaned === alreadyAtStepLog
+        || cleaned === stateNotFoundLog
+        || cleaned === undoEmptyLog
+        || isJumpLog;
     };
 
     const activeLogsCount = logs.filter(l => !isTransient(l)).length;

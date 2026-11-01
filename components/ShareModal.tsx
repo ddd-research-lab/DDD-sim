@@ -55,8 +55,22 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
             // Join non-empty IDs with commas
             const initialSetupString = initialSetupIds.filter(id => id !== '').join(',');
 
+            // 最新盤面が確実に履歴に含まれるようにスナップショットを保存
+            const storeState = useGameStore.getState();
+            if (!storeState.isHistoryBatching && storeState.currentStepIndex < 0) {
+                storeState.pushHistory();
+            }
+            const latestHistory = useGameStore.getState().history;
+            const latestLogs = useGameStore.getState().logs.filter(l => {
+                const isSystemJump = l.startsWith('ログ #') && l.endsWith('へジャンプ');
+                const isReturnJump = l === formatLog('log_return_from_jump');
+                const isSysNotFound = l === formatLog('log_sys_state_not_found') || l === formatLog('log_sys_already_at_step') || l === formatLog('log_undo_empty');
+                const isError = l === formatLog('log_error_condition') || l === formatLog('log_error_material') || l === formatLog('log_arc_crisis_fail') || l.includes('の効果は既に使用されています（ターン1回）');
+                return !isSystemJump && !isReturnJump && !isSysNotFound && !isError;
+            });
+
             // 高度な圧縮を利用してペイロードを削減
-            const compressedResult = compressHistory(history);
+            const compressedResult = compressHistory(latestHistory);
             
             // 圧縮後のスナップショット内のカードデータも最小化する（追加の最適化）
             if (compressedResult.cards) {
@@ -74,7 +88,7 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
                 explanation,
                 compressedHistory: compressedResult,
                 history: [], // 旧形式は空にして容量を節約
-                logs, // ログ本体はトップレベルに1つだけ含める
+                logs: latestLogs, // ログ本体はトップレベルに1つだけ含める
                 image: imageBase64,
                 authorId: getUserId()
             };

@@ -1,4 +1,5 @@
 import { GameState } from '@/types';
+import { CARD_DATABASE } from '@/data/cards';
 
 // UI専用フィールド（再生・ロードに不要なフィールド）
 const UI_ONLY_FIELDS: (keyof GameState)[] = [
@@ -62,13 +63,28 @@ export function compressHistory(history: Partial<GameState>[]): CompressedHistor
 
 /**
  * 圧縮された history を復元する。
- * 各スナップショットに共有 cards を再付与する。
+ * 各スナップショットに共有 cards を再付与し、CARD_DATABASE から省略されたフィールドを復元する。
  */
 export function decompressHistory(compressed: CompressedHistory): Partial<GameState>[] {
     const { cards, snapshots } = compressed;
+    const enrichedCards: GameState['cards'] = {};
+    if (cards) {
+        for (const [id, card] of Object.entries(cards)) {
+            if (!card) continue;
+            const dbDef = (card.cardId && CARD_DATABASE[card.cardId]) ? CARD_DATABASE[card.cardId] : null;
+            enrichedCards[id] = {
+                ...(dbDef || {}),
+                ...card,
+                imageUrl: card.imageUrl || dbDef?.imageUrl,
+                name: card.name || dbDef?.name || '',
+                nameJa: card.nameJa || dbDef?.nameJa || '',
+                description: card.description || dbDef?.description || '',
+            };
+        }
+    }
     return snapshots.map(snap => ({
         ...snap,
-        cards,
+        cards: enrichedCards,
     }));
 }
 
