@@ -8112,17 +8112,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
                 moveGroups = tempGroups;
 
-                // Ensure leaving field (destructions/tributes to GY/EXTRA_DECK/BANISHED) animates BEFORE entering field (summons to MONSTER/STZ)
+                // Ensure leaving field / cost to GY/BANISHED/EXTRA_DECK animates BEFORE adding to HAND, which animates BEFORE entering field (MONSTER/STZ)
                 moveGroups.sort((groupA, groupB) => {
                     const getPriority = (group: import('@/components/ReplayCardAnimationOverlay').ReplayCardMove[]) => {
                         const firstMove = group[0];
                         if (!firstMove) return 0;
                         const zone = getZoneIdOfCard(snapshot, firstMove.cardId);
                         if (!zone) return 0;
-                        if (zone === 'GRAVEYARD' || zone === 'BANISHED' || zone === 'EXTRA_DECK' || zone === 'HAND') {
-                            return 0; // Leaving field comes first
+                        if (zone === 'GRAVEYARD' || zone === 'BANISHED' || zone === 'EXTRA_DECK') {
+                            return 0; // Leaving field / Xyz detach cost comes first
                         }
-                        return 1; // Entering field comes later
+                        if (zone === 'HAND' || zone === 'DECK') {
+                            return 1; // Search / recovery to hand or deck comes second
+                        }
+                        return 2; // Entering field (summon / place) comes last
                     };
                     return getPriority(groupA) - getPriority(groupB);
                 });
@@ -8406,6 +8409,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 ? ((isNegatedStepLog && !isNegatedCutIn) ? 'negated' : 'activation')
                 : null;
 
+            // Detect if Xyz materials were detached in this step (present in prevSnapshot.materials[hostId] and absent in snapshot.materials[hostId] while host remains on field)
+            const detachedMaterialIds = new Set<string>();
+            if (prevSnapshot?.materials) {
+                for (const [hostId, prevMats] of Object.entries(prevSnapshot.materials)) {
+                    if (!Array.isArray(prevMats)) continue;
+                    const currMats: string[] = Array.isArray(snapshot.materials?.[hostId]) ? snapshot.materials[hostId] : [];
+                    const hostStillOnField =
+                        (Array.isArray(snapshot.monsterZones) && snapshot.monsterZones.includes(hostId)) ||
+                        (Array.isArray(snapshot.extraMonsterZones) && snapshot.extraMonsterZones.includes(hostId));
+                    if (hostStillOnField) {
+                        prevMats.forEach((matId: string) => {
+                            if (!currMats.includes(matId)) {
+                                detachedMaterialIds.add(matId);
+                            }
+                        });
+                    }
+                }
+            }
+            const hasXyzDetach = detachedMaterialIds.size > 0;
+
             let currentMidSnapshot = prevSnapshot ? JSON.parse(JSON.stringify(prevSnapshot)) : null;
 
             // Ensure P-scale cards that were already on the field are kept in P-zones
@@ -8425,23 +8448,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 for (let g = 0; g < moveGroups.length; g++) {
                     if (!get().isReplaying) break;
                     const group = moveGroups[g];
-                    
+                    const isDetachCostGroup = hasXyzDetach && group.some(m => detachedMaterialIds.has(m.cardId));
+
                     set({ replayAnimations: group, replayAnimDuration: currentAnimDuration });
 
                     const movedIds = new Set(group.map(m => m.cardId));
                     currentMidSnapshot = getMidSnapshot(currentMidSnapshot || snapshot, snapshot, movedIds);
 
+                    // While Xyz material is being detached to GY, keep the effect highlight and effect resolution log OFF so the material moves to GY first,
+                    // and then show the effect highlight & resolution (e.g. search to hand / burn damage) afterwards.
+                    const prevStepLogs = prevSnapshot
+                        ? (Array.isArray(prevSnapshot.logs)
+                            ? prevSnapshot.logs.filter((l: string) => !isSystemOrErrorLog(l))
+                            : chronologicalLogs.slice(0, prevLogCount).reverse())
+                        : currentLogs;
+
                     set({
                          ...currentMidSnapshot,
+                         logs: isDetachCostGroup ? prevStepLogs : currentLogs,
                          backgroundColor: currentBgColor,
                          fieldColor: currentFieldColor,
                          useGradient: currentUseGradient,
                          history: fullHistory,
                          isReplaying: true,
-                         activeReplayCardId: matchedCardId,
-                         activeReplayInstanceId: foundInstanceId,
-                         activeReplayZone: foundZone,
-                         activeReplayEffectType: initialEffectType,
+                         activeReplayCardId: isDetachCostGroup ? null : matchedCardId,
+                         activeReplayInstanceId: isDetachCostGroup ? null : foundInstanceId,
+                         activeReplayZone: isDetachCostGroup ? null : foundZone,
+                         activeReplayEffectType: isDetachCostGroup ? null : initialEffectType,
                      });
 
                     await waitReplay(currentAnimDuration);
@@ -8452,9 +8485,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (!get().isReplaying) break;
 
-            // Apply current step snapshot with target card highlighted
+            // Apply current step snapshot with target card highlighted (after Xyz material has landed in GY and effect has resolved)
             set({
                 ...snapshot,
+                logs: currentLogs,
                 backgroundColor: currentBgColor,
                 fieldColor: currentFieldColor,
                 useGradient: currentUseGradient,
