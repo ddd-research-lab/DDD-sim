@@ -30,6 +30,8 @@ import { SaveConfirmModal } from '@/components/SaveConfirmModal';
 import { formatLog } from '@/data/locales';
 import { SimToggles } from '@/components/SimToggles';
 import { ReplayCardAnimationOverlay } from '@/components/ReplayCardAnimationOverlay';
+import { ScreenshotPreview } from '@/components/ScreenshotPreview';
+import html2canvas from 'html2canvas';
 
 function ReplayLoader() {
   const searchParams = useSearchParams();
@@ -396,6 +398,61 @@ export default function Home() {
   };
 
   const mainRef = React.useRef<HTMLDivElement>(null);
+  const boardScreenshotRef = React.useRef<HTMLDivElement>(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
+
+  useEffect(() => {
+    if (!isSavingImage) return;
+    let cancelled = false;
+
+    const captureAndDownload = async () => {
+      // Allow a brief tick so ScreenshotPreview mounts in DOM
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const el = boardScreenshotRef.current;
+      if (!el || cancelled) {
+        if (!cancelled) setIsSavingImage(false);
+        return;
+      }
+
+      try {
+        // Wait for all images inside ScreenshotPreview to finish loading
+        const images = Array.from(el.querySelectorAll('img'));
+        await Promise.all(
+          images.map(img =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>(resolve => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                })
+          )
+        );
+
+        const canvas = await html2canvas(el, {
+          useCORS: true,
+          backgroundColor: '#1a1a1a',
+          scale: 1,
+          logging: false
+        });
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `board_${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error('Failed to save board image:', err);
+      } finally {
+        if (!cancelled) setIsSavingImage(false);
+      }
+    };
+
+    captureAndDownload();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSavingImage]);
 
   useEffect(() => {
     // Record and Fetch Access Stats
@@ -686,6 +743,26 @@ export default function Home() {
                   >
                     💾 {formatLog('ui_save')}
                   </button>
+                  <button
+                    onClick={() => !isSavingImage && setIsSavingImage(true)}
+                    disabled={isSavingImage}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      backgroundColor: '#00897B',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      cursor: isSavingImage ? 'wait' : 'pointer',
+                      opacity: isSavingImage ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title={formatLog('ui_download_image')}
+                  >
+                    📷 {formatLog('ui_save_image')}
+                  </button>
                   <a
                     href="/archive"
                     style={{
@@ -918,6 +995,12 @@ export default function Home() {
           onClose={() => setIsSaveConfirmOpen(false)}
           onConfirm={() => setIsShareModalOpen(true)}
         />
+
+        {isSavingImage && (
+          <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }}>
+            <ScreenshotPreview ref={boardScreenshotRef} />
+          </div>
+        )}
 
         <DragOverlay dropAnimation={null}>
           {activeCard ? <Card card={activeCard} isOverlay /> : null}

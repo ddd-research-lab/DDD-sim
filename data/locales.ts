@@ -446,6 +446,7 @@ export const LOCALE_JA: { [key: string]: string } = {
     'log_share_success': '展開ルートを送信',
     'log_share_error': '送信に失敗',
     'ui_save': '保存',
+    'ui_save_image': '画像保存',
     'ui_archive': 'ルート倉庫',
     'ui_copy_log': 'コピー',
     'ui_abbreviate': '略称',
