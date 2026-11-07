@@ -762,6 +762,9 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         if (fromLocation) return; // Manual activation only
 
         const state = useGameStore.getState();
+        const isOnField = state.monsterZones.includes(selfId) || state.extraMonsterZones.includes(selfId);
+        if (!isOnField) return;
+
         const hasHopt = (state.turnEffectUsage['c046'] || 0) > 0;
         if (hasHopt) {
             state.addLog(formatLog('log_hopt_used', { card: getCardName(state.cards[selfId], state.language) }));
@@ -2802,7 +2805,6 @@ export const EFFECT_LOGIC: { [cardId: string]: (store: any, selfId: string, from
         if (store.spellTrapZones.includes(selfId)) {
             // Check Lock Flag
             if (store.cardFlags[selfId]?.includes('c030_locked')) {
-                if (!fromLocation) store.addLog(formatLog('log_zero_machinex_p_locked'));
                 return;
             }
             if (!fromLocation) {

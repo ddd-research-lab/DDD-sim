@@ -973,7 +973,7 @@ export function ExtraDeckModal({ isOpen, onClose }: ExtraDeckModalProps) {
                                     opacity: glow ? 1 : 0.7
                                 }}
                             >
-                                <Card card={cards[instanceId]} />
+                                <Card card={cards[instanceId]} isInteractive={false} />
                                 {card.faceUp && ['c018', 'c029', 'c035'].includes(cardId) && (
                                     <div style={{
                                         position: 'absolute',
