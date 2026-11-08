@@ -3900,7 +3900,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     initialExtraDeckCardIds: [],
     lastEffectSourceId: null,
     isReplaying: false,
-    replaySpeed: 2,
+    replaySpeed: 1,
     replayAnimations: null,
     replayAnimDuration: 200,
     cycleReplaySpeed: () => set((state) => ({ replaySpeed: state.replaySpeed >= 5 ? 1 : state.replaySpeed + 1 })),

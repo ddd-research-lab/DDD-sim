@@ -975,6 +975,8 @@ export default function Home() {
             <LogWindow
               onClose={() => setIsSidebarOpen(false)}
               onOpenShare={() => setIsShareModalOpen(true)}
+              onSaveImage={() => !isSavingImage && setIsSavingImage(true)}
+              isSavingImage={isSavingImage}
               onCopyLogs={copyLogsToClipboard}
               copiedFeedback={copiedFeedback}
               useAbbreviation={useAbbreviation}

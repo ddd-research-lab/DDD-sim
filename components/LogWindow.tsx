@@ -5,6 +5,8 @@ import { formatLog } from '@/data/locales';
 interface LogWindowProps {
     onClose?: () => void;
     onOpenShare?: () => void;
+    onSaveImage?: () => void;
+    isSavingImage?: boolean;
     onCopyLogs?: () => void;
     copiedFeedback?: boolean;
     useAbbreviation?: boolean;
@@ -12,7 +14,7 @@ interface LogWindowProps {
     applyAbbreviations?: (text: string) => string;
 }
 
-export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, useAbbreviation, onToggleAbbreviation, applyAbbreviations }: LogWindowProps) {
+export function LogWindow({ onClose, onOpenShare, onSaveImage, isSavingImage, onCopyLogs, copiedFeedback, useAbbreviation, onToggleAbbreviation, applyAbbreviations }: LogWindowProps) {
     const { logs, jumpToLog, isReplaying, logOrder, showZoneInLog, toggleShowZoneInLog } = useGameStore();
 
     // 'newest' = descending (latest first), 'oldest' = ascending (oldest first)
@@ -163,20 +165,22 @@ export function LogWindow({ onClose, onOpenShare, onCopyLogs, copiedFeedback, us
             {!isReplaying && (
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                     <button
-                        onClick={onOpenShare}
+                        onClick={onSaveImage}
+                        disabled={isSavingImage}
                         style={{
                             flex: 1,
                             padding: '8px',
-                            backgroundColor: '#9C27B0',
+                            backgroundColor: '#00897B',
                             border: 'none',
                             borderRadius: '4px',
                             color: '#fff',
-                            cursor: 'pointer',
+                            cursor: isSavingImage ? 'wait' : 'pointer',
+                            opacity: isSavingImage ? 0.6 : 1,
                             fontSize: '12px',
                             fontWeight: 'bold'
                         }}
                     >
-                        {formatLog('ui_save')}
+                        📷 {formatLog('ui_save_image')}
                     </button>
                     {onCopyLogs && (
                         <button
