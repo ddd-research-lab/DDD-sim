@@ -6771,10 +6771,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                 s2.language === 'ja' ? '調和ノ天救竜の追加効果を選択してください' : 'Select additional effect of Harmonia',
                                                 [
                                                     { label: s2.language === 'ja' ? 'フィールドのカードを手札に戻す' : 'Return a card on the field to hand', value: 'bounce' },
-                                                    { label: s2.language === 'ja' ? 'フィールド of モンスターを魔法・罠ゾーンに置く' : 'Place a monster on the field in S/T zone', value: 'place' }
+                                                    { label: s2.language === 'ja' ? 'フィールドのモンスターを魔法・罠ゾーンに置く' : 'Place a monster on the field in S/T zone', value: 'place' }
                                                 ],
                                                 (choice: string) => {
                                                     if (choice === 'bounce') {
+                                                        const sNow = get();
+                                                        const hasFieldCard = [...sNow.monsterZones, ...sNow.extraMonsterZones, ...sNow.spellTrapZones, sNow.fieldZone].some(id => id !== null);
+                                                        if (!hasFieldCard) {
+                                                            useGameStore.setState({ activeEffectCardId: null });
+                                                            return;
+                                                        }
+
                                                         const fieldCardFilter = (c: Card): boolean => {
                                                             const s = get();
                                                             return s.monsterZones.includes(c.id) ||
@@ -6796,6 +6803,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
                                                             'normal'
                                                         );
                                                     } else if (choice === 'place') {
+                                                        const sNow = get();
+                                                        const hasTargetMonster = [...sNow.monsterZones, ...sNow.extraMonsterZones].some(id => id !== null);
+                                                        const hasEmptySTZone = sNow.spellTrapZones.some(id => id === null);
+                                                        if (!hasTargetMonster || !hasEmptySTZone) {
+                                                            useGameStore.setState({ activeEffectCardId: null });
+                                                            return;
+                                                        }
+
                                                         const monsterFilter2 = (c: Card): boolean => {
                                                             const s = get();
                                                             return s.monsterZones.includes(c.id) || s.extraMonsterZones.includes(c.id);
