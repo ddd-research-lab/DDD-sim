@@ -918,6 +918,27 @@ export default function Home() {
                   />
                   Gradient
                 </label>
+
+                {/* Reset Colors to Default */}
+                <button
+                  onClick={() => {
+                    setBackgroundColor('#FFFFFF');
+                    setFieldColor('rgb(80, 80, 80)');
+                    setUseGradient(false);
+                  }}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    backgroundColor: '#555',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    cursor: 'pointer'
+                  }}
+                  title="背景色とゾーンの色設定をデフォルトに戻す"
+                >
+                  デフォルト
+                </button>
               </div>
 
 
